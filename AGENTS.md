@@ -2,11 +2,11 @@
 
 ## Project Structure & Module Organization
 
-This repository is starting from an empty baseline. Keep the AutoHotkey v2 application organized around these paths:
+This repository is starting from an empty baseline. Keep the desktop interface independent from the mouse engine:
 
-- `src/WinMouseFix.ahk`: application entry point and startup coordination.
-- `src/core/`: mouse actions, active-application rules, profiles, and configuration handling.
-- `src/ui/`: settings window, tray menu, and user notifications.
+- `src/gui/`: desktop window, tray controls, settings pages, and user notifications.
+- `src/engine/`: the required AutoHotkey v2 mouse engine, application rules, profiles, and action mappings.
+- `src/shared/`: configuration schema and messages exchanged between the GUI and engine.
 - `config/default.json`: documented default settings. User settings belong in `%AppData%\WinMouseFix`, not in the repository.
 - `assets/`: icons and other files embedded in the packaged application.
 - `tests/manual/`: repeatable test checklists for mouse behavior and supported applications.
@@ -14,19 +14,19 @@ This repository is starting from an empty baseline. Keep the AutoHotkey v2 appli
 
 ## Build, Test, and Development Commands
 
-Use AutoHotkey v2 throughout the project. Once the corresponding scripts exist, the standard commands are:
+AutoHotkey v2 is the required mouse engine, and .NET 8 with WPF is the selected GUI technology. Once the corresponding scripts exist, use these stable project commands instead of technology-specific commands:
 
 ```powershell
-AutoHotkey64.exe .\src\WinMouseFix.ahk
+pwsh -File .\scripts\dev.ps1
 pwsh -File .\scripts\validate.ps1
 pwsh -File .\scripts\build.ps1
 ```
 
-The first command runs the application locally. `validate.ps1` checks syntax and configuration files; `build.ps1` uses Ahk2Exe to create `dist/WinMouseFix.exe`. The packaged program must run without a separate AutoHotkey installation.
+`dev.ps1` starts the GUI and AutoHotkey v2 engine together. `validate.ps1` checks both parts and their shared configuration; `build.ps1` packages the GUI, engine, and AutoHotkey runtime so users install no separate dependency.
 
 ## Coding Style & Naming Conventions
 
-Indent with four spaces and target AutoHotkey v2 only. Use `PascalCase` for classes and functions, `camelCase` for variables and parameters, and `UPPER_SNAKE_CASE` for fixed values. Keep UI code separate from mouse behavior. Prefer small functions with explicit parameters over shared global state. Add comments only when the reason for a decision is not apparent from the code.
+C# files follow standard .NET formatting with four-space indentation, nullable reference types enabled, and `PascalCase` for public members. AutoHotkey v2 files also use four-space indentation, `PascalCase` for functions, and `camelCase` for variables. Keep GUI code separate from mouse behavior, map form choices to predefined engine actions, and place shared message formats in `src/shared/`.
 
 ## Testing Guidelines
 
