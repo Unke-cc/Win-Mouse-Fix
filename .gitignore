@@ -1,0 +1,34 @@
+# Packaged application and build output
+dist/
+build/
+*.exe
+*.bin
+
+# AutoHotkey temporary and generated files
+*.tmp
+*.bak
+*.log
+*~
+
+# Local configuration and environment files
+.env
+.env.*
+config/local.json
+config/user.json
+
+# Editor and IDE settings
+.vscode/
+.idea/
+*.code-workspace
+
+# Windows metadata
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Test and coverage output
+coverage/
+test-results/
+
+#ai agent
+AGENTS.md
