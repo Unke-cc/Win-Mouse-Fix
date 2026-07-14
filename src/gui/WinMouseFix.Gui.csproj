@@ -26,6 +26,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Resource Include="..\..\assets\WinMouseFix.png">
+      <Link>assets\WinMouseFix.png</Link>
+    </Resource>
     <Resource Include="..\..\assets\WinMouseFix-Tray.ico">
       <Link>assets\WinMouseFix-Tray.ico</Link>
     </Resource>

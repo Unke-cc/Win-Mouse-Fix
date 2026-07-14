@@ -9,6 +9,7 @@ AppVersion={#MyAppVersion}
 AppVerName={#MyAppName} {#MyAppVersion}
 AppPublisher=Hu Wenkai
 DefaultDirName={localappdata}\Programs\Win Mouse Fix
+DisableDirPage=no
 DefaultGroupName=Win Mouse Fix
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest

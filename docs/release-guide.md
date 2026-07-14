@@ -21,7 +21,7 @@
 ## 安装行为
 
 - 安装前检查 .NET Framework 4.8。
-- 默认安装到 `%LocalAppData%\Programs\Win Mouse Fix`，不要求管理员权限。
+- 默认安装到 `%LocalAppData%\Programs\Win Mouse Fix`，用户可在安装时浏览并修改目录；安装程序不要求管理员权限，因此应选择当前用户有写入权限的位置。
 - 自动创建开始菜单入口，桌面快捷方式由用户选择。
 - 安装完成后可直接启动 Win Mouse Fix。
 - AutoHotkey v2 已包含在鼠标核心中，用户无需单独安装。

@@ -87,15 +87,6 @@
                     <ColumnDefinition Width="145" />
                 </Grid.ColumnDefinitions>
 
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <Border Width="30" Height="30" CornerRadius="9" Background="{StaticResource PrimaryBrush}">
-                        <TextBlock Text="W" Foreground="White" FontSize="14" FontWeight="Bold"
-                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
-                    </Border>
-                    <TextBlock Text="Win Mouse Fix" Margin="8,0,0,0" FontSize="13" FontWeight="SemiBold"
-                               VerticalAlignment="Center" />
-                </StackPanel>
-
                 <Border Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center"
                         Background="#EEF0F3" CornerRadius="10" Padding="3">
                     <StackPanel Orientation="Horizontal">
@@ -418,10 +409,9 @@
                                     <TextBlock Text="Win Mouse Fix" Style="{StaticResource SectionTitle}" />
                                     <TextBlock x:Name="AboutVersionText" Text="版本" Foreground="{StaticResource MutedTextBrush}" />
                                 </StackPanel>
-                                <Border Grid.Column="1" Width="48" Height="48" CornerRadius="14" Background="{StaticResource PrimaryBrush}">
-                                    <TextBlock Text="W" Foreground="White" FontSize="20" FontWeight="Bold"
-                                               HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                </Border>
+                                <Image Grid.Column="1" Width="48" Height="48" Source="/assets/WinMouseFix.png"
+                                       Stretch="Uniform" SnapsToDevicePixels="True"
+                                       AutomationProperties.Name="Win Mouse Fix 图标" />
                             </Grid>
 
                             <Grid>

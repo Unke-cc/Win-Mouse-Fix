@@ -5,15 +5,17 @@
     </filter>
   </defs>
 
-  <circle cx="256" cy="256" r="228" fill="#080808"/>
-  <circle cx="256" cy="256" r="216" fill="none" stroke="#FFFFFF" stroke-opacity="0.38" stroke-width="8"/>
+  <circle cx="256" cy="256" r="246" fill="#080808"/>
+  <circle cx="256" cy="256" r="234" fill="none" stroke="#FFFFFF" stroke-opacity="0.38" stroke-width="8"/>
 
-  <g transform="rotate(6 256 256)" filter="url(#shadow)">
-    <rect x="137" y="245" width="62" height="28" rx="14" fill="#FFFFFF"/>
-    <rect x="134" y="286" width="62" height="28" rx="14" fill="#CFCFCF"/>
-    <rect x="176" y="116" width="174" height="290" rx="87" fill="#FFFFFF"/>
-    <path d="M263 120V220" stroke="#CFCFCF" stroke-width="8" stroke-linecap="round"/>
-    <rect x="238" y="150" width="50" height="88" rx="25" fill="#080808"/>
-    <rect x="250" y="163" width="26" height="62" rx="13" fill="#D5D5D5"/>
+  <g transform="translate(256 256) scale(1.35) translate(-256 -256)">
+    <g transform="rotate(6 256 256)" filter="url(#shadow)">
+      <rect x="137" y="245" width="62" height="28" rx="14" fill="#FFFFFF"/>
+      <rect x="134" y="286" width="62" height="28" rx="14" fill="#CFCFCF"/>
+      <rect x="176" y="116" width="174" height="290" rx="87" fill="#FFFFFF"/>
+      <path d="M263 120V220" stroke="#CFCFCF" stroke-width="8" stroke-linecap="round"/>
+      <rect x="238" y="150" width="50" height="88" rx="25" fill="#080808"/>
+      <rect x="250" y="163" width="26" height="62" rx="13" fill="#D5D5D5"/>
+    </g>
   </g>
 </svg>
