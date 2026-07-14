@@ -1,0 +1,17 @@
+{
+  "protocolVersion": 1,
+  "configuration": {
+    "transport": "file",
+    "path": "%AppData%\\WinMouseFix\\config.json",
+    "pollIntervalMs": 250,
+    "configVersion": 2
+  },
+  "control": {
+    "transport": "windowsMessage",
+    "messages": {
+      "reloadConfig": "0x8001",
+      "pause": "0x8002",
+      "resume": "0x8003"
+    }
+  }
+}

@@ -1,6 +1,9 @@
 # Packaged application and build output
 dist/
 build/
+.tools/
+bin/
+obj/
 *.exe
 *.bin
 

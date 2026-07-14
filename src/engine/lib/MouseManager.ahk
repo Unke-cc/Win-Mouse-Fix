@@ -1,0 +1,447 @@
+#Requires AutoHotkey v2.0
+
+class MouseManager {
+    __New(config, appRuleManager, actionManager) {
+        this.appRuleManager := appRuleManager
+        this.actionManager := actionManager
+        this.states := Map()
+        this.registeredButtons := []
+        this.started := false
+        this.sequence := 0
+        this.scrollCarry := 0.0
+        this.smoothQueue := []
+        this.smoothTimer := ObjBindMethod(this, "ProcessSmoothWheel")
+        this.motionTimer := ObjBindMethod(this, "CheckMotionAndContext")
+        this.lastCanHandle := appRuleManager.ShouldHandle()
+        this.SetConfig(config)
+    }
+
+    SetConfig(config) {
+        wasStarted := this.started
+        if wasStarted {
+            this.UnregisterHotkeys()
+        }
+        this.CancelAll(true)
+        this.config := config
+        this.scrollConfig := config["scroll"]
+        this.desktopSwipeDirection := config["desktopSwipeDirection"]
+        this.multiClickMs := config["timing"]["multiClickMs"]
+        this.holdMs := config["timing"]["holdMs"]
+        this.dragThresholdPx := config["timing"]["dragThresholdPx"]
+        this.remaps := this.BuildRemapIndex(config["remaps"])
+        this.RebuildStates()
+        this.scrollCarry := 0.0
+        this.smoothQueue := []
+        SetTimer(this.smoothTimer, 0)
+        if wasStarted {
+            this.RegisterHotkeys()
+        }
+    }
+
+    BuildRemapIndex(remaps) {
+        result := Map()
+        for remap in remaps {
+            button := remap["button"]
+            if !result.Has(button) {
+                result[button] := Map()
+            }
+            result[button][remap["trigger"]] := remap["action"]
+        }
+        return result
+    }
+
+    RebuildStates() {
+        this.states := Map()
+        for buttonName, triggers in this.remaps {
+            hasAction := false
+            for triggerName, action in triggers {
+                if action["type"] != "None" {
+                    hasAction := true
+                    break
+                }
+            }
+            if !hasAction {
+                continue
+            }
+            state := Map(
+                "isDown", false,
+                "mode", "idle",
+                "consumed", false,
+                "gestureUsed", false,
+                "pendingClicks", 0,
+                "startX", 0,
+                "startY", 0,
+                "lastX", 0,
+                "lastY", 0,
+                "sequence", 0
+            )
+            state["clickTimer"] := ObjBindMethod(this, "FinalizeClicks", buttonName)
+            state["holdTimer"] := ObjBindMethod(this, "OnHoldTimer", buttonName)
+            this.states[buttonName] := state
+        }
+    }
+
+    Start() {
+        if this.started {
+            return
+        }
+        this.started := true
+        this.RegisterHotkeys()
+    }
+
+    RegisterHotkeys() {
+        this.registeredButtons := []
+        for buttonName, state in this.states {
+            try {
+                Hotkey("$*" buttonName, ObjBindMethod(this, "OnButtonDown", buttonName), "On")
+                Hotkey("$*" buttonName " Up", ObjBindMethod(this, "OnButtonUp", buttonName), "On")
+                this.registeredButtons.Push(buttonName)
+            } catch Error as registrationError {
+                try Hotkey("$*" buttonName, "Off")
+                FileAppend("Ignoring unsupported input " buttonName ": " registrationError.Message "`n", "**")
+            }
+        }
+        Hotkey("$*WheelUp", ObjBindMethod(this, "OnWheel", "up"), "On")
+        Hotkey("$*WheelDown", ObjBindMethod(this, "OnWheel", "down"), "On")
+        SetTimer(this.motionTimer, 15)
+    }
+
+    Stop() {
+        if !this.started {
+            return
+        }
+        this.UnregisterHotkeys()
+        this.started := false
+        this.CancelAll()
+    }
+
+    UnregisterHotkeys() {
+        SetTimer(this.motionTimer, 0)
+        SetTimer(this.smoothTimer, 0)
+        this.smoothQueue := []
+        for buttonName in this.registeredButtons {
+            try Hotkey("$*" buttonName, "Off")
+            try Hotkey("$*" buttonName " Up", "Off")
+        }
+        this.registeredButtons := []
+        try Hotkey("$*WheelUp", "Off")
+        try Hotkey("$*WheelDown", "Off")
+    }
+
+    OnButtonDown(buttonName, *) {
+        state := this.states[buttonName]
+        if state["isDown"] {
+            return
+        }
+
+        if !this.appRuleManager.ShouldHandle() {
+            this.CancelPending(state)
+            state["isDown"] := true
+            state["mode"] := "native"
+            this.actionManager.SendButtonDown(buttonName)
+            return
+        }
+
+        if state["pendingClicks"] > 0 {
+            SetTimer(state["clickTimer"], 0)
+        }
+        state["isDown"] := true
+        state["mode"] := "mapped"
+        state["consumed"] := false
+        state["gestureUsed"] := false
+        MouseGetPos(&mouseX, &mouseY)
+        state["startX"] := mouseX
+        state["startY"] := mouseY
+        state["lastX"] := mouseX
+        state["lastY"] := mouseY
+        this.sequence += 1
+        state["sequence"] := this.sequence
+        if this.HasAction(buttonName, "hold") {
+            SetTimer(state["holdTimer"], -this.holdMs)
+        }
+    }
+
+    OnButtonUp(buttonName, *) {
+        state := this.states[buttonName]
+        if !state["isDown"] {
+            return
+        }
+
+        SetTimer(state["holdTimer"], 0)
+        if state["mode"] = "native" {
+            this.actionManager.SendButtonUp(buttonName)
+            this.ResetPhysicalState(state)
+            return
+        }
+        if state["mode"] = "suppressed" {
+            this.ResetPhysicalState(state)
+            return
+        }
+
+        state["isDown"] := false
+        state["mode"] := "idle"
+        if state["consumed"] || state["gestureUsed"] {
+            state["consumed"] := false
+            state["gestureUsed"] := false
+            this.CancelPending(state)
+            return
+        }
+
+        state["pendingClicks"] += 1
+        if state["pendingClicks"] >= 2 || !this.ShouldWaitForMoreClicks(buttonName) {
+            this.FinalizeClicks(buttonName)
+        } else {
+            SetTimer(state["clickTimer"], -this.multiClickMs)
+        }
+    }
+
+    OnHoldTimer(buttonName, *) {
+        state := this.states[buttonName]
+        if !state["isDown"] || state["mode"] != "mapped" || state["consumed"] || state["gestureUsed"] {
+            return
+        }
+        if !this.appRuleManager.ShouldHandle() {
+            this.SuppressUntilRelease(state)
+            return
+        }
+
+        if this.actionManager.Execute(this.GetAction(buttonName, "hold"), Map(
+            "button", buttonName,
+            "trigger", "hold"
+        )) {
+            state["consumed"] := true
+            this.CancelPending(state)
+        }
+    }
+
+    FinalizeClicks(buttonName, *) {
+        state := this.states[buttonName]
+        clickCount := state["pendingClicks"]
+        state["pendingClicks"] := 0
+        SetTimer(state["clickTimer"], 0)
+        if clickCount <= 0 || !this.appRuleManager.ShouldHandle() {
+            return
+        }
+
+        triggerName := clickCount = 1 ? "click" : "doubleClick"
+        action := MouseManager.ResolveClickAction(this.GetAction(buttonName, triggerName))
+        this.actionManager.Execute(action, Map(
+            "button", buttonName,
+            "clickCount", clickCount,
+            "trigger", triggerName
+        ))
+    }
+
+    static ResolveClickAction(action) {
+        return action["type"] = "None"
+            ? Map("type", "Original", "shortcut", "")
+            : action
+    }
+
+    CheckMotionAndContext(*) {
+        canHandle := this.appRuleManager.ShouldHandle()
+        if !canHandle && this.lastCanHandle {
+            this.CancelAll(true)
+        }
+        this.lastCanHandle := canHandle
+        if !canHandle {
+            return
+        }
+
+        MouseGetPos(&mouseX, &mouseY)
+        for buttonName, state in this.states {
+            if !state["isDown"] || state["mode"] != "mapped" || state["consumed"] {
+                continue
+            }
+            deltaX := mouseX - state["lastX"]
+            deltaY := mouseY - state["lastY"]
+            totalX := mouseX - state["startX"]
+            totalY := mouseY - state["startY"]
+            threshold := state["gestureUsed"] ? 8 : this.dragThresholdPx
+            if Abs(totalX) < threshold && Abs(totalY) < threshold
+                && Abs(deltaX) < threshold && Abs(deltaY) < threshold {
+                continue
+            }
+
+            if Abs(totalX) >= Abs(totalY) {
+                direction := totalX < 0 ? "left" : "right"
+            } else {
+                direction := totalY < 0 ? "up" : "down"
+            }
+            action := this.GetDragAction(buttonName, direction)
+            if action["type"] = "None" {
+                continue
+            }
+            if this.actionManager.Execute(action, Map(
+                "button", buttonName,
+                "trigger", "holdDrag",
+                "dragDirection", direction,
+                "desktopSwipeDirection", this.desktopSwipeDirection,
+                "deltaX", deltaX,
+                "deltaY", deltaY
+            )) {
+                state["gestureUsed"] := true
+                SetTimer(state["holdTimer"], 0)
+                this.CancelPending(state)
+                state["lastX"] := mouseX
+                state["lastY"] := mouseY
+                if action["type"] != "ScrollMove" {
+                    state["consumed"] := true
+                }
+            }
+        }
+    }
+
+    OnWheel(direction, *) {
+        activeButton := this.FindActiveHeldButton()
+        if activeButton != "" {
+            state := this.states[activeButton]
+            if !this.appRuleManager.ShouldHandle() {
+                this.SuppressUntilRelease(state)
+                this.actionManager.SendWheel(direction)
+                return
+            }
+            action := this.GetWheelAction(activeButton, direction)
+            if action["type"] != "None" && this.actionManager.Execute(action, Map(
+                "button", activeButton,
+                "wheelDirection", direction,
+                "trigger", "holdScroll"
+            )) {
+                state["gestureUsed"] := true
+                SetTimer(state["holdTimer"], 0)
+                this.CancelPending(state)
+                return
+            }
+        }
+        this.SendRegularWheel(direction)
+    }
+
+    SendRegularWheel(direction) {
+        if !this.appRuleManager.ShouldHandle() {
+            this.actionManager.SendWheel(direction)
+            return
+        }
+        if this.scrollConfig["reverse"] {
+            direction := direction = "up" ? "down" : "up"
+        }
+        if this.scrollConfig["smooth"] {
+            this.QueueSmoothWheel(direction)
+            return
+        }
+        this.scrollCarry += this.scrollConfig["speed"]
+        sendCount := Floor(this.scrollCarry)
+        if sendCount < 1 {
+            return
+        }
+        this.scrollCarry -= sendCount
+        this.actionManager.SendWheel(direction, sendCount)
+    }
+
+    QueueSmoothWheel(direction) {
+        this.scrollCarry += this.scrollConfig["speed"]
+        sendCount := Floor(this.scrollCarry)
+        if sendCount < 1 {
+            return
+        }
+        this.scrollCarry -= sendCount
+        if this.smoothQueue.Length > 32 {
+            this.smoothQueue := []
+        }
+        loop sendCount {
+            this.smoothQueue.Push(direction)
+        }
+        SetTimer(this.smoothTimer, 12)
+    }
+
+    ProcessSmoothWheel(*) {
+        if this.smoothQueue.Length = 0 {
+            SetTimer(this.smoothTimer, 0)
+            return
+        }
+        this.actionManager.SendWheel(this.smoothQueue.RemoveAt(1))
+        if this.smoothQueue.Length = 0 {
+            SetTimer(this.smoothTimer, 0)
+        }
+    }
+
+    ShouldWaitForMoreClicks(buttonName) {
+        return this.HasAction(buttonName, "doubleClick")
+    }
+
+    FindActiveHeldButton() {
+        selectedButton := ""
+        selectedSequence := -1
+        for buttonName, state in this.states {
+            if state["isDown"] && state["mode"] = "mapped" && state["sequence"] > selectedSequence {
+                selectedButton := buttonName
+                selectedSequence := state["sequence"]
+            }
+        }
+        return selectedButton
+    }
+
+    GetAction(buttonName, triggerName) {
+        if this.remaps.Has(buttonName) && this.remaps[buttonName].Has(triggerName) {
+            return this.remaps[buttonName][triggerName]
+        }
+        return Map("type", "None", "shortcut", "")
+    }
+
+    GetWheelAction(buttonName, direction) {
+        action := this.GetAction(buttonName, "holdScroll")
+        return action["type"] != "None" ? action
+            : this.GetAction(buttonName, direction = "up" ? "wheelUp" : "wheelDown")
+    }
+
+    GetDragAction(buttonName, direction) {
+        action := this.GetAction(buttonName, "holdDrag")
+        return action["type"] != "None" ? action
+            : this.GetAction(buttonName, "drag" StrUpper(SubStr(direction, 1, 1)) SubStr(direction, 2))
+    }
+
+    HasAction(buttonName, triggerName) {
+        return this.GetAction(buttonName, triggerName)["type"] != "None"
+    }
+
+    CancelAll(suppressHeld := false) {
+        if !this.HasOwnProp("states") {
+            return
+        }
+        for buttonName, state in this.states {
+            SetTimer(state["clickTimer"], 0)
+            SetTimer(state["holdTimer"], 0)
+            state["pendingClicks"] := 0
+            state["consumed"] := false
+            state["gestureUsed"] := false
+            if state["isDown"] && state["mode"] = "mapped" && suppressHeld {
+                state["mode"] := "suppressed"
+            } else if !state["isDown"] {
+                state["mode"] := "idle"
+            }
+        }
+        this.actionManager.ReleaseAll()
+    }
+
+    CancelPending(state) {
+        SetTimer(state["clickTimer"], 0)
+        state["pendingClicks"] := 0
+    }
+
+    SuppressUntilRelease(state) {
+        SetTimer(state["clickTimer"], 0)
+        SetTimer(state["holdTimer"], 0)
+        state["pendingClicks"] := 0
+        state["consumed"] := false
+        state["gestureUsed"] := false
+        state["mode"] := "suppressed"
+        this.actionManager.ReleaseAll()
+    }
+
+    ResetPhysicalState(state) {
+        state["isDown"] := false
+        state["mode"] := "idle"
+        state["consumed"] := false
+        state["gestureUsed"] := false
+        state["pendingClicks"] := 0
+    }
+}

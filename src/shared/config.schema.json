@@ -1,0 +1,124 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://winmousefix.local/config.schema.json",
+  "title": "Win Mouse Fix configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "configVersion",
+    "enabled",
+    "pauseInFullscreen",
+    "doubleClickSpeed",
+    "desktopSwipeDirection",
+    "remaps",
+    "scroll",
+    "excludedApps",
+    "startup"
+  ],
+  "properties": {
+    "configVersion": { "const": 2 },
+    "enabled": { "type": "boolean" },
+    "pauseInFullscreen": { "type": "boolean" },
+    "doubleClickSpeed": { "enum": ["fast", "medium", "slow"] },
+    "desktopSwipeDirection": { "enum": ["followMouse", "oppositeMouse"] },
+    "remaps": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/remap" }
+    },
+    "scroll": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reverse", "speed", "smooth"],
+      "properties": {
+        "reverse": { "type": "boolean" },
+        "speed": { "type": "number", "minimum": 0.25, "maximum": 4.0 },
+        "smooth": { "type": "boolean" }
+      }
+    },
+    "excludedApps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "path", "mode"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "path": { "type": "string", "minLength": 1 },
+          "mode": { "const": "disableAll" }
+        }
+      }
+    },
+    "startup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["runAtLogin"],
+      "properties": {
+        "runAtLogin": { "type": "boolean" }
+      }
+    }
+  },
+  "$defs": {
+    "remap": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["button", "trigger", "action"],
+      "properties": {
+        "button": { "enum": ["MButton", "XButton1", "XButton2"] },
+        "trigger": {
+          "enum": [
+            "click",
+            "doubleClick",
+            "hold",
+            "holdScroll",
+            "holdDrag",
+            "dragUp",
+            "dragDown",
+            "dragLeft",
+            "dragRight",
+            "wheelUp",
+            "wheelDown"
+          ]
+        },
+        "action": { "$ref": "#/$defs/action" }
+      }
+    },
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "shortcut"],
+      "properties": {
+        "type": {
+          "enum": [
+            "None",
+            "Original",
+            "Back",
+            "Forward",
+            "MiddleClick",
+            "PrimaryClick",
+            "SecondaryClick",
+            "TaskView",
+            "ShowDesktop",
+            "StartMenu",
+            "DesktopLeft",
+            "DesktopRight",
+            "AltTab",
+            "CloseWindow",
+            "CloseTab",
+            "NextTab",
+            "PreviousTab",
+            "VolumeUp",
+            "VolumeDown",
+            "VolumeMute",
+            "MediaPlayPause",
+            "FastScroll",
+            "Zoom",
+            "ScrollMove",
+            "DesktopNavigation",
+            "CustomShortcut"
+          ]
+        },
+        "shortcut": { "type": "string" }
+      }
+    }
+  }
+}

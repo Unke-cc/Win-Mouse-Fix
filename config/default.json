@@ -1,0 +1,58 @@
+{
+  "configVersion": 2,
+  "enabled": true,
+  "pauseInFullscreen": true,
+  "doubleClickSpeed": "fast",
+  "desktopSwipeDirection": "followMouse",
+  "remaps": [
+    {
+      "button": "MButton",
+      "trigger": "click",
+      "action": { "type": "Original", "shortcut": "" }
+    },
+    {
+      "button": "MButton",
+      "trigger": "holdScroll",
+      "action": { "type": "FastScroll", "shortcut": "" }
+    },
+    {
+      "button": "XButton1",
+      "trigger": "click",
+      "action": { "type": "Back", "shortcut": "" }
+    },
+    {
+      "button": "XButton1",
+      "trigger": "doubleClick",
+      "action": { "type": "TaskView", "shortcut": "" }
+    },
+    {
+      "button": "XButton1",
+      "trigger": "holdDrag",
+      "action": { "type": "DesktopNavigation", "shortcut": "" }
+    },
+    {
+      "button": "XButton2",
+      "trigger": "click",
+      "action": { "type": "Forward", "shortcut": "" }
+    },
+    {
+      "button": "XButton2",
+      "trigger": "holdScroll",
+      "action": { "type": "Zoom", "shortcut": "" }
+    },
+    {
+      "button": "XButton2",
+      "trigger": "holdDrag",
+      "action": { "type": "ScrollMove", "shortcut": "" }
+    }
+  ],
+  "scroll": {
+    "reverse": false,
+    "speed": 1.0,
+    "smooth": false
+  },
+  "excludedApps": [],
+  "startup": {
+    "runAtLogin": false
+  }
+}

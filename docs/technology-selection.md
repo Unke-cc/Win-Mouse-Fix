@@ -9,7 +9,8 @@ Win Mouse Fix 只面向 Windows，以 **AutoHotkey v2** 作为固定的鼠标核
 | GUI | .NET 8 + WPF | 设置窗口、托盘、状态提示和核心进程管理 |
 | 页面状态 | CommunityToolkit.Mvvm | 页面状态、命令和数据绑定 |
 | 配置 | System.Text.Json | 读取、检查和写入 JSON 配置 |
-| 进程通信 | NamedPipeClientStream | GUI 与鼠标核心交换消息 |
+| MVP 设置生效 | JSON 文件监听 | GUI 保存配置后，核心在 250 毫秒内检查并读取 |
+| 后续进程通信 | NamedPipeClientStream | 查询状态、确认结果和发送控制命令 |
 | 鼠标核心 | AutoHotkey v2 | 执行全部鼠标行为和应用规则 |
 | 核心打包 | Ahk2Exe | 将脚本与 AutoHotkey v2 运行环境打包 |
 | 整体安装 | Inno Setup | 生成安装版，处理快捷方式、开机运行和卸载 |
@@ -27,16 +28,18 @@ Win Mouse Fix 只面向 Windows，以 **AutoHotkey v2** 作为固定的鼠标核
 
 GUI 是配置的唯一写入者，用户配置保存在 `%AppData%\WinMouseFix\config.json`。AutoHotkey v2 只读取、检查并执行配置，不直接改写用户设置。
 
-GUI 保存配置后，通过 Windows Named Pipes 发送 JSON 消息。消息至少支持应用配置、暂停、恢复、读取状态和重新启动核心；AutoHotkey v2 返回请求编号、配置版本、执行结果和错误信息，GUI 只在收到成功确认后显示“已生效”。
+MVP 中，GUI 保存 JSON 配置，AutoHotkey v2 核心监听文件变化并自动读取。这个方式已经能够让普通设置生效，但无法提供完整的状态确认。
+
+后续版本再加入 Windows Named Pipes。消息至少支持应用配置、暂停、恢复、读取状态和重新启动核心；AutoHotkey v2 返回请求编号、配置版本、执行结果和错误信息，GUI 只在收到成功确认后显示“已生效”。
 
 普通选项应即时生效；滑块可在用户停止操作约 150 毫秒后发送，减少重复更新。新配置无法使用时，核心继续使用上一份有效配置并返回错误；只有无法直接更新的设置才重新启动 AutoHotkey v2 核心，GUI 始终保持打开。
 
 ## 4. 最小验证清单
 
-- 运行 WPF GUI 与打包后的 AutoHotkey v2 核心，确认两者能够建立 Named Pipes 连接。
+- 运行 WPF GUI 与打包后的 AutoHotkey v2 核心，确认核心能够读取 GUI 保存的配置。
 - 在 GUI 中修改一个侧键动作，确认配置写入、核心确认响应和鼠标行为即时变化。
 - 修改滚轮参数并连续拖动滑块，确认最终数值生效且没有明显卡顿。
-- 发送无效配置，确认界面显示错误，鼠标核心仍使用上一份有效配置。
+- 写入无效配置，确认核心回到默认配置且保持运行；完整的错误提示待 Named Pipes 完成后验证。
 - 修改必须重新初始化的设置，确认只重启鼠标核心，GUI 页面、窗口位置和未保存表单不丢失。
 - 关闭设置窗口后确认核心继续运行；重新打开 GUI 后确认状态和配置一致。
 - 使用 Ahk2Exe 与 Inno Setup 生成安装包，在未单独安装 AutoHotkey 的 Windows 环境中验证安装、运行和卸载。

@@ -1,0 +1,71 @@
+<Window x:Class="WinMouseFix.Gui.ButtonOptionsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="按钮选项"
+        Width="500" SizeToContent="Height"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner">
+    <Grid Margin="28">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Margin="0,0,0,20">
+            <TextBlock Text="按钮选项" Style="{StaticResource PageTitle}" />
+            <TextBlock Text="调整按钮手势的识别方式。" Foreground="{StaticResource MutedTextBrush}" />
+        </StackPanel>
+
+        <Border Grid.Row="1" Style="{StaticResource Card}" Margin="0,0,0,18">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="160" />
+                </Grid.ColumnDefinitions>
+                <StackPanel>
+                    <TextBlock Text="双击速度" Style="{StaticResource SectionTitle}" />
+                    <TextBlock Text="用于识别自定义按钮的双击。" Foreground="{StaticResource MutedTextBrush}" />
+                </StackPanel>
+                <ComboBox Grid.Column="1"
+                          PreviewMouseWheel="ComboBox_PreviewMouseWheel"
+                          ItemsSource="{Binding DoubleClickSpeedOptions, RelativeSource={RelativeSource AncestorType=Window}}"
+                          DisplayMemberPath="Name" SelectedValuePath="Value"
+                          SelectedValue="{Binding DoubleClickSpeed, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+            </Grid>
+        </Border>
+
+        <StackPanel Grid.Row="2" Margin="0,0,0,20">
+            <TextBlock Text="虚拟桌面滑动方向" Style="{StaticResource SectionTitle}" />
+            <TextBlock Text="决定按住并拖动时，桌面页面相对鼠标的移动方向。"
+                       Foreground="{StaticResource MutedTextBrush}" Margin="0,0,0,12" />
+
+            <Border Background="White" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
+                    CornerRadius="8" Padding="14" Margin="0,0,0,10">
+                <RadioButton x:Name="FollowMouseOption" GroupName="DesktopSwipeDirection" Tag="followMouse"
+                             Checked="SwipeDirection_Checked">
+                    <StackPanel Margin="8,0,0,0">
+                        <TextBlock Text="页面跟随鼠标" FontWeight="SemiBold" />
+                        <TextBlock Text="鼠标向左  ←     页面向左  ←" Foreground="{StaticResource MutedTextBrush}" Margin="0,4,0,0" />
+                    </StackPanel>
+                </RadioButton>
+            </Border>
+
+            <Border Background="White" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
+                    CornerRadius="8" Padding="14">
+                <RadioButton x:Name="OppositeMouseOption" GroupName="DesktopSwipeDirection" Tag="oppositeMouse"
+                             Checked="SwipeDirection_Checked">
+                    <StackPanel Margin="8,0,0,0">
+                        <TextBlock Text="页面与鼠标相反" FontWeight="SemiBold" />
+                        <TextBlock Text="鼠标向左  ←     页面向右  →" Foreground="{StaticResource MutedTextBrush}" Margin="0,4,0,0" />
+                    </StackPanel>
+                </RadioButton>
+            </Border>
+        </StackPanel>
+
+        <Button Grid.Row="3" Content="完成" HorizontalAlignment="Right" MinWidth="88"
+                Style="{StaticResource PrimaryButton}" Click="Close_Click" />
+    </Grid>
+</Window>

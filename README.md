@@ -3,7 +3,7 @@
 Win Mouse Fix 是一款面向 Windows 的鼠标快捷配置工具。项目参考 MacMouseFix 的交互方式，计划通过可视化界面配置鼠标按键、滚轮、组合动作和应用规则，让用户不必编写 AutoHotkey 代码。
 
 > [!IMPORTANT]
-> 项目目前处于设计阶段。仓库中暂时只有产品与技术文档，尚无可运行程序、安装包或开发脚本。
+> 项目已经进入 MVP 开发阶段。当前版本可以运行和打包，但仍需完成不同鼠标、全屏游戏和更多 Windows 应用中的实际使用检查。
 
 ## 项目目标
 
@@ -34,12 +34,10 @@ Win Mouse Fix 是一款面向 Windows 的鼠标快捷配置工具。项目参考
 | 页面状态 | CommunityToolkit.Mvvm | 页面状态、命令和数据绑定 |
 | 配置 | System.Text.Json | 读取、检查和写入 JSON 配置 |
 | 鼠标功能 | AutoHotkey v2 | 按键、滚轮、组合动作和应用规则 |
-| 内部通信 | Windows Named Pipes + JSON | 在界面与鼠标功能之间交换配置和状态 |
+| 设置生效 | JSON 文件自动刷新 | GUI 保存配置后，AutoHotkey v2 核心自动读取 |
 | 程序打包 | Ahk2Exe + Inno Setup | 生成内部程序、安装版和便携版 |
 
-## 计划结构
-
-以下目录是设计目标，尚未全部创建：
+## 项目结构
 
 ```text
 src/
@@ -54,11 +52,19 @@ dist/           # 安装版和便携版输出
 docs/           # 产品与技术文档
 ```
 
-## 开发状态
+## 本地运行与检查
 
-当前仓库还不能安装、运行或构建。设计文档中提到的 `scripts/dev.ps1`、`scripts/validate.ps1` 和 `scripts/build.ps1` 属于后续计划，相关文件尚未提供。
+开发环境需要 .NET 8 SDK、AutoHotkey v2 和 Windows PowerShell。进入仓库目录后运行：
 
-目前可参与的工作包括核对功能范围、完善交互设计、验证技术方案，以及补充可重复执行的检查步骤。开始实现后，本节将补充开发环境、启动方式、检查命令和构建流程。
+```powershell
+.\scripts\dev.ps1
+.\scripts\validate.ps1
+.\scripts\build.ps1
+```
+
+`dev.ps1` 启动 GUI 和鼠标核心；`validate.ps1` 检查 JSON、AutoHotkey 源文件并构建 WPF；`build.ps1` 生成 `dist/app/WinMouseFix.exe` 和 `dist/app/WinMouseFix.Engine.exe`。打包需要 Ahk2Exe，可通过 `AHK2EXE_EXE` 指定其路径，也可放在 `.tools/Ahk2Exe/Ahk2Exe.exe`。
+
+当前 MVP 已包含五个设置页面、中键与按键 4/5 的九种触发方式、Windows 常用动作、滚轮设置、全屏暂停、应用排除、系统托盘、开机运行和配置自动保存。Named Pipes、安装程序、更多鼠标按键和完整的平滑滚动体验尚未完成。
 
 ## 文档
 
