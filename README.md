@@ -75,7 +75,7 @@ docs/           # 产品与技术文档
 .\scripts\package.ps1
 ```
 
-`package.ps1` 会重新生成 `dist/app`，再输出 `dist/WinMouseFix-Setup-0.1.0.exe`。如无法自动找到 Inno Setup，可将 `INNO_SETUP_COMPILER` 指向 `ISCC.exe`。
+`package.ps1` 会重新生成 `dist/app`，再输出 `dist/WinMouseFix-Setup-0.1.1.exe`。如无法自动找到 Inno Setup，可将 `INNO_SETUP_COMPILER` 指向 `ISCC.exe`。
 
 安装程序按当前用户安装到 `%LocalAppData%\Programs\Win Mouse Fix`，创建开始菜单入口，并可选择创建桌面快捷方式。同一 `AppId` 的新版本会更新原安装；更新和卸载均保留 `%AppData%\WinMouseFix` 中的设置，卸载会删除 Win Mouse Fix 的登录运行登记。详细步骤见 [发布与安装](./docs/release-guide.md)。
 
@@ -108,11 +108,11 @@ docs/           # 产品与技术文档
 
 ## License
 
-本仓库源码公开可见，但不使用 OSI 批准的 open-source license。Win Mouse Fix `0.1.0` 允许个人非商业使用、学习和私人修改；商业使用需要胡文凯事先书面许可。
+本仓库源码公开可见，但不使用 OSI 批准的 open-source license。Win Mouse Fix `0.1.1` 允许个人非商业使用、学习和私人修改；商业使用需要胡文凯事先书面许可。
 
 未经书面许可，不得转售或重新发布官方安装程序，不得将修改版本标示为官方版本，也不得使用 Win Mouse Fix 名称、图标或其他品牌元素推广其他产品。未来版本可以采用不同的个人收费或商业条款。
 
-The source code is publicly visible but is not offered under an OSI-approved open-source license. Win Mouse Fix `0.1.0` permits personal, non-commercial use, study, and private modification. Commercial use requires prior written permission from Hu Wenkai. See the bilingual license files below; if the Chinese and English texts differ in interpretation, the Chinese text controls.
+The source code is publicly visible but is not offered under an OSI-approved open-source license. Win Mouse Fix `0.1.1` permits personal, non-commercial use, study, and private modification. Commercial use requires prior written permission from Hu Wenkai. See the bilingual license files below; if the Chinese and English texts differ in interpretation, the Chinese text controls.
 
 - [Win Mouse Fix Source-Available License](./LICENSE.md)
 - [商业许可说明](./COMMERCIAL-LICENSE.md)

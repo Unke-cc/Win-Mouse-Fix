@@ -1,6 +1,6 @@
 # 发布与安装
 
-本文说明 Win Mouse Fix MVP 安装程序的生成、安装、更新、卸载和发布检查。当前安装包版本为 `0.1.0`，目标系统为 Windows 11 x64，并兼容 Windows 10 22H2 x64。
+本文说明 Win Mouse Fix MVP 安装程序的生成、安装、更新、卸载和发布检查。当前安装包版本为 `0.1.1`，目标系统为 Windows 11 x64，并兼容 Windows 10 22H2 x64。
 
 ## 生成安装程序
 
@@ -14,7 +14,7 @@
 成功后得到：
 
 - `dist/app/`：便携运行目录。
-- `dist/WinMouseFix-Setup-0.1.0.exe`：当前用户安装程序。
+- `dist/WinMouseFix-Setup-0.1.1.exe`：当前用户安装程序。
 
 `package.ps1` 会先重新生成 `dist/app`。构建期间会检查 GUI 主程序及其依赖不超过 10 MiB；鼠标核心、`config/` 和 `assets/` 不计入该数值。
 

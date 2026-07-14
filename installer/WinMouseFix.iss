@@ -1,5 +1,5 @@
 #define MyAppName "Win Mouse Fix"
-#define MyAppVersion "0.1.0"
+#define MyAppVersion "0.1.1"
 #define MyAppExeName "WinMouseFix.exe"
 
 [Setup]

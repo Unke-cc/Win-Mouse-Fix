@@ -965,7 +965,7 @@ public partial class MainWindow : Window
         try
         {
             var currentVersion = new Version(
-                typeof(MainWindow).Assembly.GetName().Version?.ToString(3) ?? "0.1.0");
+                typeof(MainWindow).Assembly.GetName().Version?.ToString(3) ?? "0.1.1");
             using var request = new HttpRequestMessage(HttpMethod.Get, LatestReleaseApiUrl);
             request.Headers.UserAgent.ParseAdd($"WinMouseFix/{currentVersion}");
             using var response = await UpdateHttpClient.SendAsync(request);
