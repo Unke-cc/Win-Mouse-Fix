@@ -130,6 +130,49 @@ function Find-GuiProject {
     return $null
 }
 
+function Get-DotNetProjectTargetFramework {
+    param(
+        [Parameter(Mandatory = $true)]
+        [System.IO.FileInfo]$Project
+    )
+
+    [xml]$projectDocument = Get-Content -LiteralPath $Project.FullName -Raw
+    $targetFrameworkNode = $projectDocument.SelectSingleNode("/Project/PropertyGroup/TargetFramework")
+    if ($null -eq $targetFrameworkNode) {
+        return $null
+    }
+
+    return $targetFrameworkNode.InnerText.Trim()
+}
+
+function Get-DotNetProjectExecutablePath {
+    param(
+        [Parameter(Mandatory = $true)]
+        [System.IO.FileInfo]$Project,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Configuration
+    )
+
+    [xml]$projectDocument = Get-Content -LiteralPath $Project.FullName -Raw
+    $assemblyNameNode = $projectDocument.SelectSingleNode("/Project/PropertyGroup/AssemblyName")
+    $assemblyName = if ($null -eq $assemblyNameNode) { $Project.BaseName } else { $assemblyNameNode.InnerText.Trim() }
+    $targetFramework = Get-DotNetProjectTargetFramework -Project $Project
+    if ([string]::IsNullOrWhiteSpace($targetFramework)) {
+        return $null
+    }
+
+    return Join-Path $Project.Directory.FullName "bin\$Configuration\$targetFramework\$assemblyName.exe"
+}
+
+function Test-NetFramework48Installed {
+    $releaseKey = Get-ItemPropertyValue `
+        -LiteralPath "Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full" `
+        -Name Release `
+        -ErrorAction SilentlyContinue
+    return $null -ne $releaseKey -and [int]$releaseKey -ge 528040
+}
+
 function Find-EngineEntryPoint {
     param(
         [Parameter(Mandatory = $true)]

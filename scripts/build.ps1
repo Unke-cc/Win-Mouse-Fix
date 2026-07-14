@@ -1,8 +1,5 @@
 [CmdletBinding()]
 param(
-    [ValidateSet("win-x64", "win-arm64")]
-    [string]$RuntimeIdentifier = "win-x64",
-
     [ValidateSet("Debug", "Release")]
     [string]$Configuration = "Release"
 )
@@ -16,6 +13,8 @@ $repositoryRoot = Get-RepositoryRoot
 $guiProject = Find-GuiProject -RepositoryRoot $repositoryRoot
 $engineEntryPoint = Find-EngineEntryPoint -RepositoryRoot $repositoryRoot
 $defaultConfig = Join-Path $repositoryRoot "config\default.json"
+$licenseFiles = @("LICENSE.md", "COMMERCIAL-LICENSE.md", "THIRD_PARTY_NOTICES.md")
+$thirdPartyLicenseRoot = Join-Path $repositoryRoot "third-party-licenses"
 $dotnetPath = Find-CommandPath -Names @("dotnet")
 $compilerPath = Find-Ahk2ExeCompiler -RepositoryRoot $repositoryRoot
 $autoHotkeyPath = Find-AutoHotkeyRuntime -RepositoryRoot $repositoryRoot
@@ -24,6 +23,8 @@ $environmentIssues = [System.Collections.Generic.List[string]]::new()
 
 if ($null -eq $guiProject) {
     $codeErrors.Add("Expected one .NET project under src/gui.")
+} elseif ((Get-DotNetProjectTargetFramework -Project $guiProject) -ne "net48") {
+    $codeErrors.Add("The GUI project must target .NET Framework 4.8 (net48).")
 }
 
 if ($null -eq $engineEntryPoint) {
@@ -32,6 +33,16 @@ if ($null -eq $engineEntryPoint) {
 
 if (-not (Test-Path -LiteralPath $defaultConfig -PathType Leaf)) {
     $codeErrors.Add("Missing config/default.json.")
+}
+
+foreach ($licenseFile in $licenseFiles) {
+    if (-not (Test-Path -LiteralPath (Join-Path $repositoryRoot $licenseFile) -PathType Leaf)) {
+        $codeErrors.Add("Missing $licenseFile.")
+    }
+}
+
+if (-not (Test-Path -LiteralPath $thirdPartyLicenseRoot -PathType Container)) {
+    $codeErrors.Add("Missing third-party-licenses directory.")
 }
 
 if ($null -eq $dotnetPath) {
@@ -70,15 +81,13 @@ if (Test-Path -LiteralPath $appOutput) {
 }
 New-Item -ItemType Directory -Path $appOutput -Force | Out-Null
 
-Write-Host "Publishing .NET GUI for $RuntimeIdentifier..." -ForegroundColor Cyan
+Write-Host "Publishing .NET Framework 4.8 GUI..." -ForegroundColor Cyan
 & $dotnetPath publish $guiProject.FullName `
     --configuration $Configuration `
-    --runtime $RuntimeIdentifier `
-    --self-contained true `
     --output $appOutput `
     --nologo `
-    -p:PublishSingleFile=true `
-    -p:DebugType=None
+    -p:DebugType=None `
+    -p:DebugSymbols=false
 $publishExitCode = $LASTEXITCODE
 if ($publishExitCode -ne 0) {
     Write-Host "[ERROR] .NET publish failed with exit code $publishExitCode." -ForegroundColor Red
@@ -110,9 +119,31 @@ $configOutput = Join-Path $appOutput "config"
 New-Item -ItemType Directory -Path $configOutput -Force | Out-Null
 Copy-Item -LiteralPath $defaultConfig -Destination (Join-Path $configOutput "default.json") -Force
 
+foreach ($licenseFile in $licenseFiles) {
+    Copy-Item `
+        -LiteralPath (Join-Path $repositoryRoot $licenseFile) `
+        -Destination (Join-Path $appOutput $licenseFile) `
+        -Force
+}
+
+Copy-Item -LiteralPath $thirdPartyLicenseRoot -Destination (Join-Path $appOutput "third-party-licenses") -Recurse -Force
+
 $assetsRoot = Join-Path $repositoryRoot "assets"
 if (Test-Path -LiteralPath $assetsRoot -PathType Container) {
     Copy-Item -LiteralPath $assetsRoot -Destination (Join-Path $appOutput "assets") -Recurse -Force
+}
+
+$guiBytes = (Get-ChildItem -LiteralPath $appOutput -File -Recurse | Where-Object {
+    $relativePath = Get-RelativePath -BasePath $appOutput -Path $_.FullName
+    $relativePath -ne "WinMouseFix.Engine.exe" -and
+        -not $relativePath.StartsWith("config\", [System.StringComparison]::OrdinalIgnoreCase) -and
+        -not $relativePath.StartsWith("assets\", [System.StringComparison]::OrdinalIgnoreCase)
+} | Measure-Object -Property Length -Sum).Sum
+$guiMiB = $guiBytes / 1MB
+Write-Host ("GUI payload: {0:N2} MiB" -f $guiMiB) -ForegroundColor Cyan
+if ($guiBytes -gt 10MB) {
+    Write-Host "[ERROR] GUI payload exceeds the 10 MiB limit." -ForegroundColor Red
+    exit 1
 }
 
 Write-Host "Build completed: $appOutput" -ForegroundColor Green

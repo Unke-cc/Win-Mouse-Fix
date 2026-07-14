@@ -411,17 +411,44 @@
                                Style="{StaticResource PageDescription}" />
 
                     <Border Style="{StaticResource Card}">
-                        <Grid>
-                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                            <StackPanel>
-                                <TextBlock Text="Win Mouse Fix" Style="{StaticResource SectionTitle}" />
-                                <TextBlock x:Name="AboutVersionText" Text="版本" Foreground="{StaticResource MutedTextBrush}" />
+                        <StackPanel>
+                            <Grid Margin="0,0,0,18">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Text="Win Mouse Fix" Style="{StaticResource SectionTitle}" />
+                                    <TextBlock x:Name="AboutVersionText" Text="版本" Foreground="{StaticResource MutedTextBrush}" />
+                                </StackPanel>
+                                <Border Grid.Column="1" Width="48" Height="48" CornerRadius="14" Background="{StaticResource PrimaryBrush}">
+                                    <TextBlock Text="W" Foreground="White" FontSize="20" FontWeight="Bold"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
+                            </Grid>
+
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="96" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <TextBlock Text="作者" Foreground="{StaticResource MutedTextBrush}" Margin="0,0,0,10" />
+                                <TextBlock Grid.Column="1" Text="胡文凯" Margin="0,0,0,10" />
+                                <TextBlock Grid.Row="1" Text="许可状态" Foreground="{StaticResource MutedTextBrush}" Margin="0,0,0,10" />
+                                <TextBlock Grid.Row="1" Grid.Column="1" Text="个人非商业使用免费；其他用途需另行许可" Margin="0,0,0,10" />
+                                <TextBlock Grid.Row="2" Text="项目主页" Foreground="{StaticResource MutedTextBrush}" />
+                                <TextBlock Grid.Row="2" Grid.Column="1" Text="github.com/Unke-cc/Win-Mouse-Fix" />
+                            </Grid>
+
+                            <StackPanel Orientation="Horizontal" Margin="0,20,0,0">
+                                <Button x:Name="CheckForUpdatesButton" Content="检查更新" Style="{StaticResource PrimaryButton}"
+                                        Click="CheckForUpdates_Click" Margin="0,0,10,0" />
+                                <Button Content="打开项目主页" Click="OpenProjectHomepage_Click" Margin="0,0,10,0" />
+                                <Button Content="查看许可" Click="OpenLicense_Click" />
                             </StackPanel>
-                            <Border Width="48" Height="48" CornerRadius="14" Background="{StaticResource PrimaryBrush}">
-                                <TextBlock Text="W" Foreground="White" FontSize="20" FontWeight="Bold"
-                                           HorizontalAlignment="Center" VerticalAlignment="Center" />
-                            </Border>
-                        </Grid>
+                        </StackPanel>
                     </Border>
 
                     <Border Style="{StaticResource Card}">

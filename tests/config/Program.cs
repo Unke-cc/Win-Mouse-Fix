@@ -21,7 +21,7 @@ try
     CheckDefaultFile();
     CheckSchema();
 
-    await File.WriteAllTextAsync(configPath, """
+    File.WriteAllText(configPath, """
         {
           "configVersion": 1,
           "enabled": false,
@@ -50,25 +50,25 @@ try
     Assert(HasRemap(migrated, "MButton", "dragUp", "TaskView"), "Directional drag mapping was not preserved.");
     Assert(HasRemap(migrated, "XButton2", "wheelDown", "VolumeDown"), "Directional wheel mapping was not preserved.");
 
-    using (var saved = JsonDocument.Parse(await File.ReadAllTextAsync(configPath)))
+    using (var saved = JsonDocument.Parse(File.ReadAllText(configPath)))
     {
         Assert(!saved.RootElement.TryGetProperty("buttons", out _), "Obsolete buttons field remained after migration.");
         Assert(saved.RootElement.GetProperty("configVersion").GetInt32() == 2, "Migrated file was not rewritten as version 2.");
         Assert(ReadDirection(saved) == "followMouse", "Migrated file did not contain the default direction.");
     }
 
-    await File.WriteAllTextAsync(configPath, """{"configVersion":2}""");
+    File.WriteAllText(configPath, """{"configVersion":2}""");
     var missingField = await service.LoadAsync();
     Assert(missingField.DesktopSwipeDirection == "followMouse", "Missing direction did not default to followMouse.");
-    using (var saved = JsonDocument.Parse(await File.ReadAllTextAsync(configPath)))
+    using (var saved = JsonDocument.Parse(File.ReadAllText(configPath)))
     {
         Assert(ReadDirection(saved) == "followMouse", "Missing direction was not written back to disk.");
     }
 
-    await File.WriteAllTextAsync(configPath, """{"configVersion":2,"desktopSwipeDirection":"sideways"}""");
+    File.WriteAllText(configPath, """{"configVersion":2,"desktopSwipeDirection":"sideways"}""");
     var invalidField = await service.LoadAsync();
     Assert(invalidField.DesktopSwipeDirection == "followMouse", "Invalid direction was not normalized.");
-    using (var saved = JsonDocument.Parse(await File.ReadAllTextAsync(configPath)))
+    using (var saved = JsonDocument.Parse(File.ReadAllText(configPath)))
     {
         Assert(ReadDirection(saved) == "followMouse", "Normalized direction was not written back to disk.");
     }
@@ -77,7 +77,7 @@ try
     await service.SaveAsync(invalidField);
     var roundTrip = await service.LoadAsync();
     Assert(roundTrip.DesktopSwipeDirection == "oppositeMouse", "Direction did not survive save and reload.");
-    using (var saved = JsonDocument.Parse(await File.ReadAllTextAsync(configPath)))
+    using (var saved = JsonDocument.Parse(File.ReadAllText(configPath)))
     {
         Assert(saved.RootElement.GetProperty("remaps").EnumerateArray()
             .All(item => !item.TryGetProperty("triggerOrder", out _)), "triggerOrder was written to configuration JSON.");
@@ -192,9 +192,9 @@ static void CheckActionOptions()
     {
         var options = (ActionOption[])converter.Convert(
             trigger, typeof(ActionOption[]), null!, CultureInfo.InvariantCulture);
-        Assert(options[0] == new ActionOption("Original", "执行原功能"),
+        Assert(options[0].Type == "Original" && options[0].Name == "执行原功能",
             $"Original action is not first for {trigger}.");
-        Assert(options[^1] == new ActionOption("None", "不执行动作"),
+        Assert(options[options.Length - 1].Type == "None" && options[options.Length - 1].Name == "不执行动作",
             $"None action is not last for {trigger}.");
     }
 }

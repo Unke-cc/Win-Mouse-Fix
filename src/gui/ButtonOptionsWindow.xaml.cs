@@ -45,4 +45,14 @@ public partial class ButtonOptionsWindow : Window
     private void Close_Click(object sender, RoutedEventArgs e) => Close();
 }
 
-public sealed record DoubleClickSpeedOption(string Value, string Name);
+public sealed class DoubleClickSpeedOption
+{
+    public DoubleClickSpeedOption(string value, string name)
+    {
+        Value = value;
+        Name = name;
+    }
+
+    public string Value { get; }
+    public string Name { get; }
+}

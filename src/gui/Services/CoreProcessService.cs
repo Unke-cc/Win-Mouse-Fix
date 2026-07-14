@@ -194,7 +194,19 @@ public sealed class CoreProcessService
         }
     }
 
-    private readonly record struct LaunchTarget(string FileName, string Arguments, string WorkingDirectory);
+    private readonly struct LaunchTarget
+    {
+        public LaunchTarget(string fileName, string arguments, string workingDirectory)
+        {
+            FileName = fileName;
+            Arguments = arguments;
+            WorkingDirectory = workingDirectory;
+        }
+
+        public string FileName { get; }
+        public string Arguments { get; }
+        public string WorkingDirectory { get; }
+    }
 
     private delegate bool EnumWindowsProc(IntPtr window, IntPtr parameter);
 

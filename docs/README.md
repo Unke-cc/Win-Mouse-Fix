@@ -7,6 +7,9 @@
 1. [应用设计文档](./application-design.md)：了解产品目标、功能范围、用户操作流程、页面设计、程序组成、配置方式、发布方式和验收标准。
 2. [MacMouseFix 3.0.8 功能盘点](./macmousefix-feature-inventory.md)：查看参考应用的页面、鼠标功能、系统功能、Windows 对应方式和版本建议。
 3. [技术选择](./technology-selection.md)：查看 GUI、AutoHotkey v2 核心、通信方式、配置职责、打包工具和最小验证清单。
+4. [发布与安装](./release-guide.md)：查看安装程序生成、安装、更新、卸载和发布检查。
+5. [项目许可](../LICENSE.md)：查看 `0.1.0` 的个人非商业使用范围和限制。
+6. [贡献指南](../CONTRIBUTING.md)：查看提交要求、验证命令和 CLA 接受方式。
 
 ## 文档分类
 
@@ -15,8 +18,9 @@
 | 产品与设计 | 说明要解决的问题、功能边界及用户体验 | [应用设计文档](./application-design.md)、[功能盘点](./macmousefix-feature-inventory.md) |
 | 开发 | 说明技术选择、程序关系、本地运行和代码约定 | [技术选择](./technology-selection.md) |
 | 测试 | 记录可重复执行的功能检查步骤 | 暂无 |
-| 发布 | 说明打包、安装、升级和版本记录 | 暂无 |
+| 发布 | 说明打包、安装、更新、卸载和版本检查 | [发布与安装](./release-guide.md) |
 | 用户帮助 | 面向普通用户说明安装和使用方法 | 暂无 |
+| 许可与贡献 | 规定使用范围、商业授权、第三方声明和贡献授权 | [项目许可](../LICENSE.md)、[商业许可](../COMMERCIAL-LICENSE.md)、[第三方组件声明](../THIRD_PARTY_NOTICES.md)、[贡献指南](../CONTRIBUTING.md)、[CLA](../CLA.md) |
 
 ## 维护规则
 

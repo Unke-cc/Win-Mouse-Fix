@@ -167,6 +167,18 @@ if ($null -eq $guiProject) {
 } else {
     $relativeProjectPath = Get-RelativePath -BasePath $repositoryRoot -Path $guiProject.FullName
     Add-Note ".NET project exists: $relativeProjectPath"
+    $guiTargetFramework = Get-DotNetProjectTargetFramework -Project $guiProject
+    if ($guiTargetFramework -ne "net48") {
+        Add-CodeError "GUI project must target .NET Framework 4.8 (net48), but targets '$guiTargetFramework'."
+    } else {
+        Add-Note "GUI project targets .NET Framework 4.8."
+    }
+}
+
+if (-not (Test-NetFramework48Installed)) {
+    Add-EnvironmentIssue ".NET Framework 4.8 runtime is not installed."
+} else {
+    Add-Note ".NET Framework 4.8 runtime is installed."
 }
 
 $dotnetPath = Find-CommandPath -Names @("dotnet")
@@ -181,22 +193,45 @@ if ($null -eq $dotnetPath) {
     } else {
         Add-Note ".NET project builds successfully."
 
-        Write-Host "[RUN]   dotnet run GUI auxiliary-window check" -ForegroundColor Cyan
-        & $dotnetPath run --project $guiProject.FullName --configuration Debug --no-build -- --validate-ui
-        if ($LASTEXITCODE -ne 0) {
-            Add-CodeError "GUI auxiliary-window check failed with exit code $LASTEXITCODE."
+        $guiExecutable = Get-DotNetProjectExecutablePath -Project $guiProject -Configuration "Debug"
+        Write-Host "[RUN]   $guiExecutable --validate-ui" -ForegroundColor Cyan
+        if ($null -eq $guiExecutable -or -not (Test-Path -LiteralPath $guiExecutable -PathType Leaf)) {
+            Add-CodeError "GUI executable was not produced at the expected .NET Framework output path."
         } else {
-            Add-Note "GUI auxiliary windows load successfully."
+            $guiValidation = Start-Process `
+                -FilePath $guiExecutable `
+                -ArgumentList "--validate-ui" `
+                -WindowStyle Hidden `
+                -PassThru `
+                -Wait
+            if ($guiValidation.ExitCode -ne 0) {
+                Add-CodeError "GUI auxiliary-window check failed with exit code $($guiValidation.ExitCode)."
+            } else {
+                Add-Note "GUI auxiliary windows load successfully."
+            }
         }
 
         $configCheckProject = Join-Path $repositoryRoot "tests\config\WinMouseFix.ConfigCheck.csproj"
         if (Test-Path -LiteralPath $configCheckProject -PathType Leaf) {
-            Write-Host "[RUN]   dotnet run tests/config/WinMouseFix.ConfigCheck.csproj" -ForegroundColor Cyan
-            & $dotnetPath run --project $configCheckProject --configuration Debug --nologo
-            if ($LASTEXITCODE -ne 0) {
-                Add-CodeError "Configuration migration check failed with exit code $LASTEXITCODE."
+            $configCheckProjectInfo = [System.IO.FileInfo]::new($configCheckProject)
+            Write-Host "[RUN]   dotnet build tests/config/WinMouseFix.ConfigCheck.csproj" -ForegroundColor Cyan
+            & $dotnetPath build $configCheckProject --configuration Debug --nologo
+            $configBuildExitCode = $LASTEXITCODE
+            if ($configBuildExitCode -ne 0) {
+                Add-CodeError "Configuration check build failed with exit code $configBuildExitCode."
             } else {
-                Add-Note "Configuration migration and recommended settings check passed."
+                $configCheckExecutable = Get-DotNetProjectExecutablePath -Project $configCheckProjectInfo -Configuration "Debug"
+                Write-Host "[RUN]   $configCheckExecutable" -ForegroundColor Cyan
+                if ($null -eq $configCheckExecutable -or -not (Test-Path -LiteralPath $configCheckExecutable -PathType Leaf)) {
+                    Add-CodeError "Configuration check executable was not produced at the expected .NET Framework output path."
+                } else {
+                    & $configCheckExecutable
+                    if ($LASTEXITCODE -ne 0) {
+                        Add-CodeError "Configuration migration check failed with exit code $LASTEXITCODE."
+                    } else {
+                        Add-Note "Configuration migration and recommended settings check passed."
+                    }
+                }
             }
         }
     }

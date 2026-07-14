@@ -1,4 +1,5 @@
 using Microsoft.Win32;
+using System.Diagnostics;
 
 namespace WinMouseFix.Gui.Services;
 
@@ -9,7 +10,7 @@ public sealed class StartupService
 
     public (bool Applied, string Message) SetRunAtLogin(bool enabled)
     {
-        var executablePath = Environment.ProcessPath;
+        var executablePath = Process.GetCurrentProcess().MainModule?.FileName;
         if (string.IsNullOrWhiteSpace(executablePath))
         {
             return (false, "无法确定 Win Mouse Fix 程序路径");
@@ -25,7 +26,7 @@ public sealed class StartupService
 
             if (enabled)
             {
-                runKey.SetValue(ValueName, $"\"{executablePath}\"", RegistryValueKind.String);
+                runKey.SetValue(ValueName, $"\"{executablePath}\" --background", RegistryValueKind.String);
                 return (true, "已设置登录 Windows 后运行");
             }
 

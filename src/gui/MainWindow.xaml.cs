@@ -1,6 +1,9 @@
 using System.Collections.Specialized;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.IO;
+using System.Net;
+using System.Net.Http;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Input;
@@ -16,6 +19,10 @@ namespace WinMouseFix.Gui;
 
 public partial class MainWindow : Window
 {
+    private const string ProjectHomepageUrl = "https://github.com/Unke-cc/Win-Mouse-Fix";
+    private const string LicenseUrl = ProjectHomepageUrl + "/blob/main/LICENSE.md";
+    private const string LatestReleaseApiUrl = "https://api.github.com/repos/Unke-cc/Win-Mouse-Fix/releases/latest";
+    private static readonly HttpClient UpdateHttpClient = new() { Timeout = TimeSpan.FromSeconds(10) };
     private readonly ConfigurationService configurationService = new();
     private readonly CoreProcessService coreProcessService = new();
     private readonly StartupService startupService = new();
@@ -47,6 +54,8 @@ public partial class MainWindow : Window
     private FrameworkElement? activePage;
     private int resizeVersion;
     private bool centerWindowAfterInitialResize = true;
+
+    internal bool StartHidden { get; set; }
 
     public MainWindow()
     {
@@ -81,7 +90,7 @@ public partial class MainWindow : Window
         trayIcon = new Forms.NotifyIcon
         {
             Text = "Win Mouse Fix",
-            Icon = Drawing.SystemIcons.Application,
+            Icon = LoadTrayIcon(),
             ContextMenuStrip = trayMenu,
             Visible = true
         };
@@ -89,6 +98,28 @@ public partial class MainWindow : Window
 
         InitializeComponent();
         coreProcessService.StatusChanged += (_, _) => Dispatcher.BeginInvoke(SyncRunningState);
+    }
+
+    internal static Drawing.Icon LoadTrayIcon()
+    {
+        try
+        {
+            var resource = System.Windows.Application.GetResourceStream(
+                new Uri("pack://application:,,,/assets/WinMouseFix-Tray.ico"));
+            if (resource is not null)
+            {
+                using (resource.Stream)
+                using (var icon = new Drawing.Icon(resource.Stream))
+                {
+                    return (Drawing.Icon)icon.Clone();
+                }
+            }
+        }
+        catch (Exception ex) when (ex is ArgumentException or IOException or NotSupportedException)
+        {
+        }
+
+        return (Drawing.Icon)Drawing.SystemIcons.Application.Clone();
     }
 
     private async void Window_Loaded(object sender, RoutedEventArgs e)
@@ -116,6 +147,14 @@ public partial class MainWindow : Window
         if (config.Enabled)
         {
             StartCore(showMessage: false);
+        }
+
+        if (StartHidden)
+        {
+            Hide();
+            Opacity = 1;
+            ShowActivated = true;
+            ShowInTaskbar = true;
         }
     }
 
@@ -348,15 +387,15 @@ public partial class MainWindow : Window
             targetHeight = 68 + measuredContent.DesiredSize.Height + frameHeight;
         }
 
-        targetHeight = Math.Clamp(targetHeight, MinHeight, maxHeight);
+        targetHeight = Clamp(targetHeight, MinHeight, maxHeight);
         var targetTop = centerAfterResize
-            ? Math.Clamp(workArea.Top + (workArea.Height - targetHeight) / 2,
+            ? Clamp(workArea.Top + (workArea.Height - targetHeight) / 2,
                 safeTop,
                 Math.Max(safeTop, safeBottom - targetHeight))
             : Top;
         if (!centerAfterResize && activePage == ButtonsPage)
         {
-            targetTop = Math.Clamp(Top, safeTop, Math.Max(safeTop, safeBottom - targetHeight));
+            targetTop = Clamp(Top, safeTop, Math.Max(safeTop, safeBottom - targetHeight));
         }
 
         var version = ++resizeVersion;
@@ -394,6 +433,9 @@ public partial class MainWindow : Window
         BeginAnimation(TopProperty, topAnimation, HandoffBehavior.SnapshotAndReplace);
         BeginAnimation(HeightProperty, heightAnimation, HandoffBehavior.SnapshotAndReplace);
     }
+
+    private static double Clamp(double value, double minimum, double maximum) =>
+        Math.Max(minimum, Math.Min(maximum, value));
 
     private void BrowseApplication_Click(object sender, RoutedEventArgs e)
     {
@@ -915,6 +957,113 @@ public partial class MainWindow : Window
         StatusBar.Visibility = Visibility.Collapsed;
     }
 
+    private async void CheckForUpdates_Click(object sender, RoutedEventArgs e)
+    {
+        CheckForUpdatesButton.IsEnabled = false;
+        CheckForUpdatesButton.Content = "正在检查…";
+
+        try
+        {
+            var currentVersion = new Version(
+                typeof(MainWindow).Assembly.GetName().Version?.ToString(3) ?? "0.1.0");
+            using var request = new HttpRequestMessage(HttpMethod.Get, LatestReleaseApiUrl);
+            request.Headers.UserAgent.ParseAdd($"WinMouseFix/{currentVersion}");
+            using var response = await UpdateHttpClient.SendAsync(request);
+            if (response.StatusCode == HttpStatusCode.NotFound)
+            {
+                ShowStatus("暂未发布可检查的版本");
+                return;
+            }
+
+            response.EnsureSuccessStatusCode();
+            using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+            var tag = document.RootElement.TryGetProperty("tag_name", out var tagElement) &&
+                      tagElement.ValueKind == JsonValueKind.String
+                ? tagElement.GetString()
+                : null;
+            if (!TryParseReleaseVersion(tag, out var latestVersion))
+            {
+                ShowStatus("最新版本信息无法识别，请打开项目主页查看");
+                return;
+            }
+
+            if (latestVersion <= currentVersion)
+            {
+                ShowStatus($"当前已是最新版本 {currentVersion}");
+                return;
+            }
+
+            var releaseAddress = document.RootElement.TryGetProperty("html_url", out var urlElement) &&
+                                 urlElement.ValueKind == JsonValueKind.String
+                ? urlElement.GetString()
+                : null;
+            if (!Uri.TryCreate(releaseAddress, UriKind.Absolute, out var releaseUri) ||
+                releaseUri.Scheme != Uri.UriSchemeHttps ||
+                !string.Equals(releaseUri.Host, "github.com", StringComparison.OrdinalIgnoreCase))
+            {
+                ShowStatus("新版本下载地址无效，请打开项目主页查看");
+                return;
+            }
+
+            if (System.Windows.MessageBox.Show(this,
+                    $"发现新版本 {latestVersion}，是否打开下载页面？",
+                    "Win Mouse Fix 更新",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Information) == MessageBoxResult.Yes)
+            {
+                OpenWebPage(releaseUri.AbsoluteUri, "无法打开最新版本页面");
+            }
+        }
+        catch (TaskCanceledException)
+        {
+            ShowStatus("检查更新超时，请稍后重试");
+        }
+        catch (HttpRequestException)
+        {
+            ShowStatus("无法连接 GitHub，请确认网络连接后重试");
+        }
+        catch (JsonException)
+        {
+            ShowStatus("GitHub 返回的版本信息无法读取，请稍后重试");
+        }
+        finally
+        {
+            CheckForUpdatesButton.Content = "检查更新";
+            CheckForUpdatesButton.IsEnabled = true;
+        }
+    }
+
+    internal static bool TryParseReleaseVersion(string? tag, out Version version)
+    {
+        var value = tag?.Trim().TrimStart('v', 'V').Split('-', '+')[0];
+        if (Version.TryParse(value, out var parsed) && parsed.Build >= 0)
+        {
+            version = new Version(parsed.Major, parsed.Minor, parsed.Build);
+            return true;
+        }
+
+        version = new Version();
+        return false;
+    }
+
+    private void OpenProjectHomepage_Click(object sender, RoutedEventArgs e) =>
+        OpenWebPage(ProjectHomepageUrl, "无法打开项目主页");
+
+    private void OpenLicense_Click(object sender, RoutedEventArgs e) =>
+        OpenWebPage(LicenseUrl, "无法打开许可页面");
+
+    private void OpenWebPage(string address, string errorMessage)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo(address) { UseShellExecute = true });
+        }
+        catch (Exception ex) when (ex is Win32Exception or InvalidOperationException)
+        {
+            ShowStatus($"{errorMessage}，请在浏览器中访问：{address}");
+        }
+    }
+
     private void ToggleEnabledFromTray()
     {
         SetAppEnabled(!coreProcessService.IsRunning, showMessage: false);
@@ -938,8 +1087,12 @@ public partial class MainWindow : Window
         trayIcon.Text = running ? "Win Mouse Fix - 已启动" : "Win Mouse Fix - 已停止";
     }
 
-    private void ShowSettingsWindow()
+    internal void ShowSettingsWindow()
     {
+        StartHidden = false;
+        Opacity = 1;
+        ShowActivated = true;
+        ShowInTaskbar = true;
         Show();
         if (WindowState == WindowState.Minimized)
         {
@@ -967,6 +1120,7 @@ public partial class MainWindow : Window
         await SaveConfigurationAsync(showConfirmation: false);
         coreProcessService.Stop();
         trayIcon.Visible = false;
+        trayIcon.Icon?.Dispose();
         trayIcon.Dispose();
         System.Windows.Application.Current.Shutdown();
     }

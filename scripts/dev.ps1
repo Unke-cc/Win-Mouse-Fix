@@ -20,6 +20,8 @@ if ($null -eq $engineEntryPoint) {
 
 if ($null -eq $guiProject) {
     $codeErrors.Add("Expected one .NET project under src/gui.")
+} elseif ((Get-DotNetProjectTargetFramework -Project $guiProject) -ne "net48") {
+    $codeErrors.Add("The GUI project must target .NET Framework 4.8 (net48).")
 }
 
 if ($null -eq $dotnetPath) {
@@ -28,6 +30,10 @@ if ($null -eq $dotnetPath) {
 
 if ($null -eq $autoHotkeyPath) {
     $environmentIssues.Add("AutoHotkey v2 was not found. Set AUTOHOTKEY_EXE or install AutoHotkey v2.")
+}
+
+if (-not (Test-NetFramework48Installed)) {
+    $environmentIssues.Add(".NET Framework 4.8 runtime is not installed.")
 }
 
 foreach ($message in $codeErrors) {
@@ -48,6 +54,20 @@ if ($environmentIssues.Count -gt 0) {
 
 $engineProcess = $null
 try {
+    $relativeProjectPath = Get-RelativePath -BasePath $repositoryRoot -Path $guiProject.FullName
+    Write-Host "Building $relativeProjectPath for .NET Framework 4.8..." -ForegroundColor Cyan
+    & $dotnetPath build $guiProject.FullName --configuration Debug --nologo
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "GUI build failed with exit code $LASTEXITCODE." -ForegroundColor Red
+        exit 1
+    }
+
+    $guiExecutable = Get-DotNetProjectExecutablePath -Project $guiProject -Configuration "Debug"
+    if ($null -eq $guiExecutable -or -not (Test-Path -LiteralPath $guiExecutable -PathType Leaf)) {
+        Write-Host "GUI executable was not produced at the expected .NET Framework output path." -ForegroundColor Red
+        exit 1
+    }
+
     Write-Host "Starting AutoHotkey mouse engine..." -ForegroundColor Cyan
     $quotedEnginePath = '"' + $engineEntryPoint.FullName.Replace('"', '\"') + '"'
     $engineProcess = Start-Process -FilePath $autoHotkeyPath -ArgumentList @("/ErrorStdOut", $quotedEnginePath) -PassThru -WindowStyle Hidden
@@ -58,12 +78,10 @@ try {
         exit 1
     }
 
-    $relativeProjectPath = Get-RelativePath -BasePath $repositoryRoot -Path $guiProject.FullName
-    Write-Host "Starting GUI from $relativeProjectPath..." -ForegroundColor Cyan
-    & $dotnetPath run --project $guiProject.FullName
-    $guiExitCode = $LASTEXITCODE
-    if ($guiExitCode -ne 0) {
-        Write-Host "GUI stopped with exit code $guiExitCode." -ForegroundColor Red
+    Write-Host "Starting GUI from $guiExecutable..." -ForegroundColor Cyan
+    $guiProcess = Start-Process -FilePath $guiExecutable -PassThru -Wait
+    if ($guiProcess.ExitCode -ne 0) {
+        Write-Host "GUI stopped with exit code $($guiProcess.ExitCode)." -ForegroundColor Red
         exit 1
     }
 } finally {

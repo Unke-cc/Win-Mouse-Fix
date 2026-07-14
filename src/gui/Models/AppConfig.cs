@@ -253,7 +253,7 @@ public sealed class ScrollConfig : BindableBase
     public double Speed
     {
         get => speed;
-        set => SetProperty(ref speed, Math.Clamp(value, 0.25, 4.0));
+        set => SetProperty(ref speed, Math.Max(0.25, Math.Min(4.0, value)));
     }
 
     public bool Smooth
@@ -281,7 +281,17 @@ public sealed class StartupConfig : BindableBase
     }
 }
 
-public sealed record ActionOption(string Type, string Name);
+public sealed class ActionOption
+{
+    public ActionOption(string type, string name)
+    {
+        Type = type;
+        Name = name;
+    }
+
+    public string Type { get; }
+    public string Name { get; }
+}
 
 internal sealed class LegacyAppConfig
 {

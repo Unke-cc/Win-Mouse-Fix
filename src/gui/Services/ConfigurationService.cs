@@ -26,16 +26,16 @@ public sealed class ConfigurationService
 
     public string ConfigPath => Path.Combine(ConfigDirectory, "config.json");
 
-    public async Task<AppConfig> LoadAsync()
+    public Task<AppConfig> LoadAsync()
     {
         if (!File.Exists(ConfigPath))
         {
-            return new AppConfig();
+            return Task.FromResult(new AppConfig());
         }
 
         try
         {
-            var json = await File.ReadAllTextAsync(ConfigPath);
+            var json = File.ReadAllText(ConfigPath);
             using var document = JsonDocument.Parse(json);
             var version = 1;
             if (document.RootElement.TryGetProperty("configVersion", out var versionElement))
@@ -51,8 +51,8 @@ public sealed class ConfigurationService
                 var legacy = document.RootElement.Deserialize<LegacyAppConfig>(JsonOptions)
                              ?? new LegacyAppConfig();
                 var migrated = MigrateLegacyConfig(legacy);
-                await TrySaveMigratedAsync(migrated);
-                return migrated;
+                TrySaveMigrated(migrated);
+                return Task.FromResult(migrated);
             }
 
             if (version != AppConfig.CurrentVersion)
@@ -68,40 +68,38 @@ public sealed class ConfigurationService
             config.Normalize();
             if (rewriteDesktopSwipeDirection)
             {
-                await TrySaveMigratedAsync(config);
+                TrySaveMigrated(config);
             }
-            return config;
+            return Task.FromResult(config);
         }
         catch (JsonException)
         {
             PreserveInvalidConfig();
-            return new AppConfig();
+            return Task.FromResult(new AppConfig());
         }
         catch (IOException)
         {
-            return new AppConfig();
+            return Task.FromResult(new AppConfig());
         }
     }
 
-    public async Task SaveAsync(AppConfig config)
+    public Task SaveAsync(AppConfig config)
     {
         config.Normalize();
         Directory.CreateDirectory(ConfigDirectory);
 
         var temporaryPath = ConfigPath + ".tmp";
-        await using (var stream = new FileStream(
-                         temporaryPath,
-                         FileMode.Create,
-                         FileAccess.Write,
-                         FileShare.None,
-                         4096,
-                         useAsync: true))
+        File.WriteAllText(temporaryPath, JsonSerializer.Serialize(config, JsonOptions));
+        if (File.Exists(ConfigPath))
         {
-            await JsonSerializer.SerializeAsync(stream, config, JsonOptions);
-            await stream.FlushAsync();
+            File.Replace(temporaryPath, ConfigPath, null);
+        }
+        else
+        {
+            File.Move(temporaryPath, ConfigPath);
         }
 
-        File.Move(temporaryPath, ConfigPath, overwrite: true);
+        return Task.CompletedTask;
     }
 
     private void PreserveInvalidConfig()
@@ -117,11 +115,11 @@ public sealed class ConfigurationService
         }
     }
 
-    private async Task TrySaveMigratedAsync(AppConfig config)
+    private void TrySaveMigrated(AppConfig config)
     {
         try
         {
-            await SaveAsync(config);
+            SaveAsync(config).GetAwaiter().GetResult();
         }
         catch (IOException)
         {
