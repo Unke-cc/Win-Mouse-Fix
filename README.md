@@ -112,6 +112,8 @@ docs/           # 产品与技术文档
 
 未经书面许可，不得转售或重新发布官方安装程序，不得将修改版本标示为官方版本，也不得使用 Win Mouse Fix 名称、图标或其他品牌元素推广其他产品。未来版本可以采用不同的个人收费或商业条款。
 
+The source code is publicly visible but is not offered under an OSI-approved open-source license. Win Mouse Fix `0.1.0` permits personal, non-commercial use, study, and private modification. Commercial use requires prior written permission from Hu Wenkai. See the bilingual license files below; if the Chinese and English texts differ in interpretation, the Chinese text controls.
+
 - [Win Mouse Fix Source-Available License](./LICENSE.md)
 - [商业许可说明](./COMMERCIAL-LICENSE.md)
 - [第三方组件声明](./THIRD_PARTY_NOTICES.md)

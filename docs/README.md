@@ -8,8 +8,8 @@
 2. [MacMouseFix 3.0.8 功能盘点](./macmousefix-feature-inventory.md)：查看参考应用的页面、鼠标功能、系统功能、Windows 对应方式和版本建议。
 3. [技术选择](./technology-selection.md)：查看 GUI、AutoHotkey v2 核心、通信方式、配置职责、打包工具和最小验证清单。
 4. [发布与安装](./release-guide.md)：查看安装程序生成、安装、更新、卸载和发布检查。
-5. [项目许可](../LICENSE.md)：查看 `0.1.0` 的个人非商业使用范围和限制。
-6. [贡献指南](../CONTRIBUTING.md)：查看提交要求、验证命令和 CLA 接受方式。
+5. [项目许可](../LICENSE.md)：查看 `0.1.0` 的中英双语个人非商业使用范围和限制。
+6. [贡献指南](../CONTRIBUTING.md)：查看中英双语提交要求、验证命令和 CLA 接受方式。
 
 ## 文档分类
 
