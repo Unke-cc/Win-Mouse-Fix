@@ -313,7 +313,8 @@
                                                 <ColumnDefinition Width="*" />
                                                 <ColumnDefinition Width="160" />
                                             </Grid.ColumnDefinitions>
-                                            <Button Content="−" Width="30" Height="30" Padding="0" ToolTip="删除映射"
+                                            <Button Content="−" Width="30" Height="30" MinWidth="30" MinHeight="30"
+                                                    Padding="0" ToolTip="删除映射"
                                                     CommandParameter="{Binding}" Click="RemoveRemap_Click" />
                                             <TextBlock Grid.Column="1" Style="{StaticResource TriggerLabel}" />
                                             <ComboBox Grid.Column="2" Margin="0,0,8,0"
@@ -357,7 +358,9 @@
                                 <TextBlock Text="反向滚动" Style="{StaticResource SectionTitle}" />
                                 <TextBlock Text="让滚轮方向与 Windows 默认方向相反。" Foreground="{StaticResource MutedTextBrush}" />
                             </StackPanel>
-                            <CheckBox Grid.Column="1" IsChecked="{Binding Scroll.Reverse, Mode=TwoWay}" />
+                            <CheckBox Grid.Column="1" Style="{StaticResource ToggleSwitch}"
+                                      AutomationProperties.Name="反向滚动"
+                                      IsChecked="{Binding Scroll.Reverse, Mode=TwoWay}" />
                         </Grid>
                     </Border>
 
@@ -389,7 +392,9 @@
                                 <TextBlock Text="基础平滑" Style="{StaticResource SectionTitle}" />
                                 <TextBlock Text="减少滚轮每一格之间的跳跃感。" Foreground="{StaticResource MutedTextBrush}" />
                             </StackPanel>
-                            <CheckBox Grid.Column="1" IsChecked="{Binding Scroll.Smooth, Mode=TwoWay}" />
+                            <CheckBox Grid.Column="1" Style="{StaticResource ToggleSwitch}"
+                                      AutomationProperties.Name="基础平滑"
+                                      IsChecked="{Binding Scroll.Smooth, Mode=TwoWay}" />
                         </Grid>
                     </Border>
                 </StackPanel>
@@ -454,7 +459,7 @@
         <Border x:Name="StatusBar" Grid.Row="2" Background="#172033" Padding="16,10" Visibility="Collapsed">
             <Grid>
                 <TextBlock x:Name="StatusMessageText" Foreground="White" />
-                <Button Content="关闭" Foreground="White" Background="Transparent" BorderThickness="0" Padding="4,0"
+                <Button Content="关闭" MinWidth="52" MinHeight="28" Padding="10,4"
                         HorizontalAlignment="Right" Click="CloseStatus_Click" />
             </Grid>
         </Border>
