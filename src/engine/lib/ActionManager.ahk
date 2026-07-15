@@ -187,9 +187,10 @@ class ActionManager {
         SendEvent("{Blind}{" button " up}")
     }
 
-    SendWheel(direction, count := 1) {
+    SendWheel(direction, count := 1, preserveModifiers := true) {
         wheelKey := direction = "down" ? "WheelDown" : "WheelUp"
-        SendEvent("{Blind}{" wheelKey " " Max(1, count) "}")
+        prefix := preserveModifiers ? "{Blind}" : ""
+        SendEvent(prefix "{" wheelKey " " Max(1, count) "}")
     }
 
     SendHorizontalWheel(direction, count := 1) {

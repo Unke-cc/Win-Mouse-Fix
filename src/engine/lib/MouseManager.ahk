@@ -533,8 +533,9 @@ class MouseManager {
         }
         this.BeginScrollMode(scrollMode)
         direction := this.ApplyScrollDirection(direction)
+        preserveModifiers := scrollMode != "fast" && scrollMode != "precision"
         if this.scrollConfig["smooth"] {
-            this.QueueSmoothWheel(direction, speedScale)
+            this.QueueSmoothWheel(direction, speedScale, preserveModifiers)
             return
         }
         this.scrollCarry += this.scrollConfig["speed"] * speedScale
@@ -543,7 +544,7 @@ class MouseManager {
             return
         }
         this.scrollCarry -= sendCount
-        this.actionManager.SendWheel(direction, sendCount)
+        this.actionManager.SendWheel(direction, sendCount, preserveModifiers)
     }
 
     BeginScrollMode(scrollMode) {
@@ -556,7 +557,7 @@ class MouseManager {
         SetTimer(this.smoothTimer, 0)
     }
 
-    QueueSmoothWheel(direction, speedScale := 1.0) {
+    QueueSmoothWheel(direction, speedScale := 1.0, preserveModifiers := true) {
         this.scrollCarry += this.scrollConfig["speed"] * speedScale
         sendCount := Floor(this.scrollCarry)
         if sendCount < 1 {
@@ -567,7 +568,10 @@ class MouseManager {
             this.smoothQueue := []
         }
         loop sendCount {
-            this.smoothQueue.Push(direction)
+            this.smoothQueue.Push(Map(
+                "direction", direction,
+                "preserveModifiers", preserveModifiers
+            ))
         }
         SetTimer(this.smoothTimer, 12)
     }
@@ -577,7 +581,8 @@ class MouseManager {
             SetTimer(this.smoothTimer, 0)
             return
         }
-        this.actionManager.SendWheel(this.smoothQueue.RemoveAt(1))
+        item := this.smoothQueue.RemoveAt(1)
+        this.actionManager.SendWheel(item["direction"], 1, item["preserveModifiers"])
         if this.smoothQueue.Length = 0 {
             SetTimer(this.smoothTimer, 0)
         }
