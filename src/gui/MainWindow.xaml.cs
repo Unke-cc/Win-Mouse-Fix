@@ -872,11 +872,69 @@ public partial class MainWindow : Window
         Dispatcher.BeginInvoke(ResizeWindowForActivePage, DispatcherPriority.Loaded);
     }
 
-    private void ModifierComboBox_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+    private void ModifierShortcutBox_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
     {
-        if (sender is System.Windows.Controls.ComboBox { IsDropDownOpen: false })
+        if (sender is not System.Windows.Controls.TextBox { Tag: string propertyName } shortcutBox)
         {
-            e.Handled = true;
+            return;
+        }
+
+        e.Handled = true;
+        var key = e.Key == Key.System ? e.SystemKey : e.Key;
+        if (key is Key.Delete or Key.Back or Key.Escape)
+        {
+            SetScrollModifier(propertyName, "none");
+            shortcutBox.Focus();
+            return;
+        }
+
+        var token = key switch
+        {
+            Key.LeftCtrl or Key.RightCtrl => "ctrl",
+            Key.LeftAlt or Key.RightAlt => "alt",
+            Key.LeftShift or Key.RightShift => "shift",
+            Key.LWin or Key.RWin => "win",
+            _ => null
+        };
+        if (token is null)
+        {
+            ShowStatus("只能使用 Ctrl、Alt、Shift 或 Win 组合，普通键不能使用");
+            shortcutBox.Focus();
+            return;
+        }
+
+        var pressed = new HashSet<string>(StringComparer.Ordinal);
+        if (Keyboard.IsKeyDown(Key.LeftCtrl) || Keyboard.IsKeyDown(Key.RightCtrl) || token == "ctrl")
+        {
+            pressed.Add("ctrl");
+        }
+        if (Keyboard.IsKeyDown(Key.LeftAlt) || Keyboard.IsKeyDown(Key.RightAlt) || token == "alt")
+        {
+            pressed.Add("alt");
+        }
+        if (Keyboard.IsKeyDown(Key.LeftShift) || Keyboard.IsKeyDown(Key.RightShift) || token == "shift")
+        {
+            pressed.Add("shift");
+        }
+        if (Keyboard.IsKeyDown(Key.LWin) || Keyboard.IsKeyDown(Key.RWin) || token == "win")
+        {
+            pressed.Add("win");
+        }
+
+        SetScrollModifier(propertyName, string.Join("+", ModifierOrder.Where(pressed.Contains)));
+        shortcutBox.Focus();
+    }
+
+    private static readonly string[] ModifierOrder = { "ctrl", "alt", "shift", "win" };
+
+    private void SetScrollModifier(string propertyName, string value)
+    {
+        switch (propertyName)
+        {
+            case nameof(ScrollConfig.HorizontalModifier): config.Scroll.HorizontalModifier = value; break;
+            case nameof(ScrollConfig.FastModifier): config.Scroll.FastModifier = value; break;
+            case nameof(ScrollConfig.PrecisionModifier): config.Scroll.PrecisionModifier = value; break;
+            case nameof(ScrollConfig.ZoomModifier): config.Scroll.ZoomModifier = value; break;
         }
     }
 
@@ -1191,7 +1249,7 @@ public partial class MainWindow : Window
             return releaseVersion;
         }
 
-        return ReleaseVersion.FromVersion(assembly.GetName().Version ?? new Version(0, 1, 2));
+        return ReleaseVersion.FromVersion(assembly.GetName().Version ?? new Version(0, 1, 3));
     }
 
     private void OpenProjectHomepage_Click(object sender, RoutedEventArgs e)

@@ -10,6 +10,7 @@
         Closing="Window_Closing">
     <Window.Resources>
         <controls:TriggerActionOptionsConverter x:Key="TriggerActionOptionsConverter" />
+        <controls:ModifierShortcutConverter x:Key="ModifierShortcutConverter" />
         <Style x:Key="TopNavigationItem" TargetType="RadioButton">
             <Setter Property="MinWidth" Value="72" />
             <Setter Property="Height" Value="36" />
@@ -411,7 +412,7 @@
                     <Border Style="{StaticResource Card}">
                         <StackPanel>
                             <TextBlock Text="键盘修饰键" Style="{StaticResource SectionTitle}" />
-                            <TextBlock Text="按住指定按键并滚动滚轮，即可执行对应动作；同一个按键不能重复分配。"
+                            <TextBlock Text="按住 Ctrl、Alt、Shift 或 Win 的组合并滚动滚轮，即可执行对应动作；普通键不能使用。"
                                        Foreground="{StaticResource MutedTextBrush}" Margin="0,4,0,14" />
                             <Grid>
                                 <Grid.ColumnDefinitions>
@@ -424,59 +425,51 @@
                                 </Grid.RowDefinitions>
 
                                 <Grid Margin="0,0,10,12">
-                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="96" /></Grid.ColumnDefinitions>
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="150" /></Grid.ColumnDefinitions>
                                     <StackPanel Margin="0,0,8,0">
                                         <TextBlock Text="水平滚动" FontWeight="SemiBold" />
                                         <TextBlock Text="上滚向左，下滚向右。" Foreground="{StaticResource MutedTextBrush}" FontSize="11" />
                                     </StackPanel>
-                                    <ComboBox Grid.Column="1" SelectedValuePath="Tag" PreviewMouseWheel="ModifierComboBox_PreviewMouseWheel"
-                                              SelectedValue="{Binding Scroll.HorizontalModifier, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
-                                        <ComboBoxItem Tag="none" Content="关闭" /><ComboBoxItem Tag="ctrl" Content="Ctrl" />
-                                        <ComboBoxItem Tag="alt" Content="Alt" /><ComboBoxItem Tag="shift" Content="Shift" />
-                                        <ComboBoxItem Tag="win" Content="Win" />
-                                    </ComboBox>
+                                    <TextBox Grid.Column="1" Tag="HorizontalModifier" IsReadOnly="True"
+                                             Text="{Binding Scroll.HorizontalModifier, Converter={StaticResource ModifierShortcutConverter}}"
+                                             PreviewKeyDown="ModifierShortcutBox_PreviewKeyDown"
+                                             ToolTip="按下 Ctrl、Alt、Shift 或 Win 组合；按 Delete 清除" />
                                 </Grid>
 
                                 <Grid Grid.Column="1" Margin="10,0,0,12">
-                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="96" /></Grid.ColumnDefinitions>
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="150" /></Grid.ColumnDefinitions>
                                     <StackPanel Margin="0,0,8,0">
                                         <TextBlock Text="快速滚动" FontWeight="SemiBold" />
                                         <TextBlock Text="当前速度的 4 倍。" Foreground="{StaticResource MutedTextBrush}" FontSize="11" />
                                     </StackPanel>
-                                    <ComboBox Grid.Column="1" SelectedValuePath="Tag" PreviewMouseWheel="ModifierComboBox_PreviewMouseWheel"
-                                              SelectedValue="{Binding Scroll.FastModifier, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
-                                        <ComboBoxItem Tag="none" Content="关闭" /><ComboBoxItem Tag="ctrl" Content="Ctrl" />
-                                        <ComboBoxItem Tag="alt" Content="Alt" /><ComboBoxItem Tag="shift" Content="Shift" />
-                                        <ComboBoxItem Tag="win" Content="Win" />
-                                    </ComboBox>
+                                    <TextBox Grid.Column="1" Tag="FastModifier" IsReadOnly="True"
+                                             Text="{Binding Scroll.FastModifier, Converter={StaticResource ModifierShortcutConverter}}"
+                                             PreviewKeyDown="ModifierShortcutBox_PreviewKeyDown"
+                                             ToolTip="按下 Ctrl、Alt、Shift 或 Win 组合；按 Delete 清除" />
                                 </Grid>
 
                                 <Grid Grid.Row="1" Margin="0,0,10,0">
-                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="96" /></Grid.ColumnDefinitions>
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="150" /></Grid.ColumnDefinitions>
                                     <StackPanel Margin="0,0,8,0">
                                         <TextBlock Text="精确滚动" FontWeight="SemiBold" />
                                         <TextBlock Text="当前速度的四分之一。" Foreground="{StaticResource MutedTextBrush}" FontSize="11" />
                                     </StackPanel>
-                                    <ComboBox Grid.Column="1" SelectedValuePath="Tag" PreviewMouseWheel="ModifierComboBox_PreviewMouseWheel"
-                                              SelectedValue="{Binding Scroll.PrecisionModifier, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
-                                        <ComboBoxItem Tag="none" Content="关闭" /><ComboBoxItem Tag="ctrl" Content="Ctrl" />
-                                        <ComboBoxItem Tag="alt" Content="Alt" /><ComboBoxItem Tag="shift" Content="Shift" />
-                                        <ComboBoxItem Tag="win" Content="Win" />
-                                    </ComboBox>
+                                    <TextBox Grid.Column="1" Tag="PrecisionModifier" IsReadOnly="True"
+                                             Text="{Binding Scroll.PrecisionModifier, Converter={StaticResource ModifierShortcutConverter}}"
+                                             PreviewKeyDown="ModifierShortcutBox_PreviewKeyDown"
+                                             ToolTip="按下 Ctrl、Alt、Shift 或 Win 组合；按 Delete 清除" />
                                 </Grid>
 
                                 <Grid Grid.Row="1" Grid.Column="1" Margin="10,0,0,0">
-                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="96" /></Grid.ColumnDefinitions>
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="150" /></Grid.ColumnDefinitions>
                                     <StackPanel Margin="0,0,8,0">
                                         <TextBlock Text="放大或缩小" FontWeight="SemiBold" />
                                         <TextBlock Text="在支持的应用中缩放。" Foreground="{StaticResource MutedTextBrush}" FontSize="11" />
                                     </StackPanel>
-                                    <ComboBox Grid.Column="1" SelectedValuePath="Tag" PreviewMouseWheel="ModifierComboBox_PreviewMouseWheel"
-                                              SelectedValue="{Binding Scroll.ZoomModifier, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
-                                        <ComboBoxItem Tag="none" Content="关闭" /><ComboBoxItem Tag="ctrl" Content="Ctrl" />
-                                        <ComboBoxItem Tag="alt" Content="Alt" /><ComboBoxItem Tag="shift" Content="Shift" />
-                                        <ComboBoxItem Tag="win" Content="Win" />
-                                    </ComboBox>
+                                    <TextBox Grid.Column="1" Tag="ZoomModifier" IsReadOnly="True"
+                                             Text="{Binding Scroll.ZoomModifier, Converter={StaticResource ModifierShortcutConverter}}"
+                                             PreviewKeyDown="ModifierShortcutBox_PreviewKeyDown"
+                                             ToolTip="按下 Ctrl、Alt、Shift 或 Win 组合；按 Delete 清除" />
                                 </Grid>
                             </Grid>
                         </StackPanel>

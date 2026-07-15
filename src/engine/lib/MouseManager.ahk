@@ -13,6 +13,13 @@ class MouseManager {
         this.smoothQueue := []
         this.smoothTimer := ObjBindMethod(this, "ProcessSmoothWheel")
         this.motionTimer := ObjBindMethod(this, "CheckMotionAndContext")
+        this.wheelRestoreTimer := ObjBindMethod(this, "RestoreWheelHotkeys")
+        this.wheelHotkeysSuspended := false
+        this.wheelBurstStart := 0
+        this.wheelBurstCount := 0
+        this.wheelBurstWindowMs := 300
+        this.wheelBurstThreshold := 20
+        this.wheelSuspendMs := 750
         this.lastCanHandle := appRuleManager.ShouldHandle()
         this.SetConfig(config)
     }
@@ -34,6 +41,7 @@ class MouseManager {
         this.scrollMode := "regular"
         this.smoothQueue := []
         SetTimer(this.smoothTimer, 0)
+        this.ResetWheelFilter()
         if wasStarted {
             this.RegisterHotkeys()
         }
@@ -106,6 +114,7 @@ class MouseManager {
         }
         Hotkey("$*WheelUp", ObjBindMethod(this, "OnWheel", "up"), "On")
         Hotkey("$*WheelDown", ObjBindMethod(this, "OnWheel", "down"), "On")
+        this.wheelHotkeysSuspended := false
         SetTimer(this.motionTimer, 15)
     }
 
@@ -121,7 +130,9 @@ class MouseManager {
     UnregisterHotkeys() {
         SetTimer(this.motionTimer, 0)
         SetTimer(this.smoothTimer, 0)
+        SetTimer(this.wheelRestoreTimer, 0)
         this.smoothQueue := []
+        this.wheelHotkeysSuspended := false
         for buttonName in this.registeredButtons {
             try Hotkey("$*" buttonName, "Off")
             try Hotkey("$*" buttonName " Up", "Off")
@@ -317,6 +328,10 @@ class MouseManager {
     }
 
     OnWheel(direction, *) {
+        if this.ShouldFilterTouchpadBurst() {
+            this.SuspendWheelHotkeys()
+            return
+        }
         activeButton := this.FindActiveHeldButton()
         if activeButton != "" {
             state := this.states[activeButton]
@@ -363,22 +378,107 @@ class MouseManager {
         this.SendRegularWheel(direction)
     }
 
+    ShouldFilterTouchpadBurst() {
+        ; Windows exposes many touchpad gestures as a high-frequency wheel stream.
+        ; AHK's wheel hotkey does not include the originating device, so only
+        ; neutral, unmodified bursts are treated as touchpad input here.
+        if !this.appRuleManager.ShouldHandle() {
+            this.wheelBurstStart := 0
+            this.wheelBurstCount := 0
+            return false
+        }
+        if this.FindActiveHeldButton() != "" || this.HasPressedScrollModifier() {
+            this.wheelBurstStart := 0
+            this.wheelBurstCount := 0
+            return false
+        }
+
+        now := A_TickCount
+        if this.wheelBurstStart = 0 || now - this.wheelBurstStart > this.wheelBurstWindowMs {
+            this.wheelBurstStart := now
+            this.wheelBurstCount := 0
+        }
+        this.wheelBurstCount += 1
+        return this.wheelBurstCount >= this.wheelBurstThreshold
+    }
+
+    HasPressedScrollModifier() {
+        for _, modifier in [
+            this.scrollConfig["horizontalModifier"],
+            this.scrollConfig["fastModifier"],
+            this.scrollConfig["precisionModifier"],
+            this.scrollConfig["zoomModifier"]
+        ] {
+            if modifier != "none" && this.IsModifierPressed(modifier) {
+                return true
+            }
+        }
+        return false
+    }
+
+    SuspendWheelHotkeys() {
+        if this.wheelHotkeysSuspended {
+            return
+        }
+        try Hotkey("$*WheelUp", "Off")
+        try Hotkey("$*WheelDown", "Off")
+        this.wheelHotkeysSuspended := true
+        SetTimer(this.wheelRestoreTimer, -this.wheelSuspendMs)
+    }
+
+    RestoreWheelHotkeys(*) {
+        if !this.started {
+            return
+        }
+        Hotkey("$*WheelUp", ObjBindMethod(this, "OnWheel", "up"), "On")
+        Hotkey("$*WheelDown", ObjBindMethod(this, "OnWheel", "down"), "On")
+        this.wheelHotkeysSuspended := false
+        this.wheelBurstStart := 0
+        this.wheelBurstCount := 0
+    }
+
+    ResetWheelFilter() {
+        SetTimer(this.wheelRestoreTimer, 0)
+        this.wheelHotkeysSuspended := false
+        this.wheelBurstStart := 0
+        this.wheelBurstCount := 0
+    }
+
     TryModifierWheel(direction) {
-        if this.IsModifierPressed(this.scrollConfig["horizontalModifier"]) {
+        matches := [
+            Map("modifier", this.scrollConfig["horizontalModifier"], "action", "horizontal"),
+            Map("modifier", this.scrollConfig["fastModifier"], "action", "fast"),
+            Map("modifier", this.scrollConfig["precisionModifier"], "action", "precision"),
+            Map("modifier", this.scrollConfig["zoomModifier"], "action", "zoom")
+        ]
+        selected := ""
+        selectedLength := 0
+        for match in matches {
+            modifier := match["modifier"]
+            if this.IsModifierPressed(modifier) {
+                length := this.ModifierTokenCount(modifier)
+                if length > selectedLength {
+                    selected := match["action"]
+                    selectedLength := length
+                }
+            }
+        }
+
+        if selected = "horizontal" {
             this.BeginScrollMode("horizontal")
             direction := this.ApplyScrollDirection(direction)
             this.actionManager.SendHorizontalWheel(direction = "down" ? "right" : "left")
             return true
         }
-        if this.IsModifierPressed(this.scrollConfig["fastModifier"]) {
+        if selected = "fast" {
             this.SendRegularWheel(direction, 4.0, "fast")
             return true
         }
-        if this.IsModifierPressed(this.scrollConfig["precisionModifier"]) {
+        if selected = "precision" {
             this.SendRegularWheel(direction, 0.25, "precision")
             return true
         }
-        if this.IsModifierPressed(this.scrollConfig["zoomModifier"]) {
+        if selected = "zoom" {
             this.BeginScrollMode("zoom")
             direction := this.ApplyScrollDirection(direction)
             return this.actionManager.Execute(Map("type", "Zoom", "shortcut", ""), Map(
@@ -390,18 +490,36 @@ class MouseManager {
     }
 
     IsModifierPressed(modifier) {
-        switch modifier {
-            case "ctrl":
-                return GetKeyState("LControl", "P") || GetKeyState("RControl", "P")
-            case "alt":
-                return GetKeyState("LAlt", "P") || GetKeyState("RAlt", "P")
-            case "shift":
-                return GetKeyState("LShift", "P") || GetKeyState("RShift", "P")
-            case "win":
-                return GetKeyState("LWin", "P") || GetKeyState("RWin", "P")
-            default:
-                return false
+        if modifier = "" || modifier = "none" {
+            return false
         }
+        for token in StrSplit(modifier, "+") {
+            switch Trim(token) {
+                case "ctrl":
+                    if !(GetKeyState("LControl", "P") || GetKeyState("RControl", "P")) {
+                        return false
+                    }
+                case "alt":
+                    if !(GetKeyState("LAlt", "P") || GetKeyState("RAlt", "P")) {
+                        return false
+                    }
+                case "shift":
+                    if !(GetKeyState("LShift", "P") || GetKeyState("RShift", "P")) {
+                        return false
+                    }
+                case "win":
+                    if !(GetKeyState("LWin", "P") || GetKeyState("RWin", "P")) {
+                        return false
+                    }
+                default:
+                    return false
+            }
+        }
+        return true
+    }
+
+    ModifierTokenCount(modifier) {
+        return modifier = "" || modifier = "none" ? 0 : StrSplit(modifier, "+").Length
     }
 
     ApplyScrollDirection(direction) {

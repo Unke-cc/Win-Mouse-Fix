@@ -1,6 +1,6 @@
 #define MyAppName "Win Mouse Fix"
-#define MyAppVersion "0.1.2"
-#define MyAppDisplayVersion "0.1.2 Beta"
+#define MyAppVersion "0.1.3"
+#define MyAppDisplayVersion "0.1.3 Beta"
 #define MyAppExeName "WinMouseFix.exe"
 
 [Setup]
@@ -18,7 +18,7 @@ ArchitecturesAllowed=x64os
 ArchitecturesInstallIn64BitMode=x64os
 MinVersion=10.0.19045
 OutputDir=..\dist
-OutputBaseFilename=WinMouseFix-Setup-0.1.2-beta
+OutputBaseFilename=WinMouseFix-Setup-0.1.3-beta
 SetupIconFile=..\assets\WinMouseFix.ico
 Compression=lzma2
 SolidCompression=yes

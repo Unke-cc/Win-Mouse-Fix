@@ -3,7 +3,7 @@
 Win Mouse Fix 是一款面向 Windows 的可视化鼠标快捷配置工具。通过清晰的界面配置鼠标按键、滚轮、按住滚动、按住拖动和应用规则，让鼠标操作按照用户自己的习惯工作。
 
 > [!NOTE]
-> 当前版本为 `0.1.2 Beta`，已经可以运行并生成安装程序。欢迎在不同鼠标设备和 Windows 10/11 环境中试用并提交反馈。
+> 当前版本为 `0.1.3 Beta`，已经可以运行并生成安装程序。欢迎在不同鼠标设备和 Windows 10/11 环境中试用并提交反馈。
 
 ## 项目目标
 
@@ -18,6 +18,7 @@ Win Mouse Fix 是一款面向 Windows 的可视化鼠标快捷配置工具。通
 - 自定义中键、侧键及更多鼠标按键。
 - 支持点击、双击、长按、按住滚动和按住拖动。
 - 支持上下滚动、水平滚动、快速滚动、精确滚动和缩放。
+- 滚动修饰键支持自定义多个 Ctrl、Alt、Shift、Win 组合，普通键不会被接受。
 - 提供开始菜单、任务视图、虚拟桌面、音量和媒体控制等常用动作。
 - 支持多套配置切换、导入、导出、备份和恢复。
 - 支持按应用暂停、全屏暂停、系统托盘和开机启动。
@@ -74,7 +75,7 @@ docs/           # 产品与技术文档
 .\scripts\package.ps1
 ```
 
-`package.ps1` 会重新生成 `dist/app`，再输出 `dist/WinMouseFix-Setup-0.1.2-beta.exe`。如无法自动找到 Inno Setup，可将 `INNO_SETUP_COMPILER` 指向 `ISCC.exe`。
+`package.ps1` 会重新生成 `dist/app`，再输出 `dist/WinMouseFix-Setup-0.1.3-beta.exe`。如无法自动找到 Inno Setup，可将 `INNO_SETUP_COMPILER` 指向 `ISCC.exe`。
 
 安装程序按当前用户安装到 `%LocalAppData%\Programs\Win Mouse Fix`，创建开始菜单入口，并可选择创建桌面快捷方式。同一 `AppId` 的新版本会更新原安装；更新和卸载均保留 `%AppData%\WinMouseFix` 中的设置，卸载会删除 Win Mouse Fix 的登录运行登记。详细步骤见 [发布与安装](./docs/release-guide.md)。
 
@@ -105,11 +106,11 @@ docs/           # 产品与技术文档
 
 ## License
 
-本仓库源码公开可见，但不使用 OSI 批准的 open-source license。Win Mouse Fix `0.1.2 Beta` 允许个人非商业使用、学习和私人修改；商业使用需要胡文凯事先书面许可。
+本仓库源码公开可见，但不使用 OSI 批准的 open-source license。Win Mouse Fix `0.1.3 Beta` 允许个人非商业使用、学习和私人修改；商业使用需要胡文凯事先书面许可。
 
 未经书面许可，不得转售或重新发布官方安装程序，不得将修改版本标示为官方版本，也不得使用 Win Mouse Fix 名称、图标或其他品牌元素推广其他产品。未来版本可以采用不同的个人收费或商业条款。
 
-The source code is publicly visible but is not offered under an OSI-approved open-source license. Win Mouse Fix `0.1.2 Beta` permits personal, non-commercial use, study, and private modification. Commercial use requires prior written permission from Hu Wenkai. See the bilingual license files below; if the Chinese and English texts differ in interpretation, the Chinese text controls.
+The source code is publicly visible but is not offered under an OSI-approved open-source license. Win Mouse Fix `0.1.3 Beta` permits personal, non-commercial use, study, and private modification. Commercial use requires prior written permission from Hu Wenkai. See the bilingual license files below; if the Chinese and English texts differ in interpretation, the Chinese text controls.
 
 - [Win Mouse Fix Source-Available License](./LICENSE.md)
 - [商业许可说明](./COMMERCIAL-LICENSE.md)

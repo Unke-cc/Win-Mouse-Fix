@@ -132,7 +132,8 @@
       }
     },
     "modifier": {
-      "enum": ["none", "ctrl", "alt", "shift", "win"]
+      "type": "string",
+      "pattern": "^(none|(?:ctrl|alt|shift|win)(?:\\+(?:ctrl|alt|shift|win))*)$"
     }
   }
 }

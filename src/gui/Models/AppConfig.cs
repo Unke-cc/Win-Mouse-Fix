@@ -398,8 +398,28 @@ public sealed class ScrollConfig : BindableBase
 
     private static string NormalizeModifier(string? value, string fallback)
     {
-        var normalized = value?.Trim().ToLowerInvariant();
-        return normalized is "none" or "ctrl" or "alt" or "shift" or "win" ? normalized : fallback;
+        var normalized = value?.Trim().ToLowerInvariant() ?? string.Empty;
+        if (string.Equals(normalized, "none", StringComparison.Ordinal))
+        {
+            return "none";
+        }
+
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return fallback;
+        }
+
+        var rawTokens = normalized.Split('+')
+            .Select(token => token.Trim())
+            .ToArray();
+        var tokens = new HashSet<string>(rawTokens, StringComparer.Ordinal);
+        if (tokens.Count == 0 || tokens.Count != rawTokens.Length || rawTokens.Any(string.IsNullOrWhiteSpace) ||
+            tokens.Any(token => token is not ("ctrl" or "alt" or "shift" or "win")))
+        {
+            return fallback;
+        }
+
+        return string.Join("+", new[] { "ctrl", "alt", "shift", "win" }.Where(tokens.Contains));
     }
 }
 

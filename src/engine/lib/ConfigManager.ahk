@@ -284,8 +284,36 @@ class ConfigManager {
 
     NormalizeModifier(value, fallback) {
         value := StrLower(Trim(value))
-        return value = "none" || value = "ctrl" || value = "alt" || value = "shift" || value = "win"
-            ? value : fallback
+        if value = "none" {
+            return "none"
+        }
+        if value = "" {
+            return fallback
+        }
+        if SubStr(value, 1, 1) = "+" || SubStr(value, -1) = "+" || InStr(value, "++") {
+            return fallback
+        }
+
+        tokens := StrSplit(value, "+")
+        seen := Map()
+        for token in tokens {
+            token := Trim(token)
+            if token != "ctrl" && token != "alt" && token != "shift" && token != "win" {
+                return fallback
+            }
+            if seen.Has(token) {
+                return fallback
+            }
+            seen[token] := true
+        }
+
+        result := ""
+        for token in ["ctrl", "alt", "shift", "win"] {
+            if seen.Has(token) {
+                result .= result = "" ? token : "+" token
+            }
+        }
+        return result = "" ? fallback : result
     }
 
     NormalizeExcludedApps(source) {

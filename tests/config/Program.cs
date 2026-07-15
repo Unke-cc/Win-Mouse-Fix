@@ -94,6 +94,15 @@ try
     Assert(roundTrip.ReceiveBetaUpdates, "Beta update preference did not survive save and reload.");
     Assert(roundTrip.Scroll.HorizontalModifier == "shift" && roundTrip.Scroll.FastModifier == "ctrl",
         "Scroll modifier normalization or persistence is incorrect.");
+    roundTrip.Scroll.HorizontalModifier = "shift+ctrl";
+    Assert(roundTrip.Scroll.HorizontalModifier == "ctrl+shift",
+        "Modifier combinations were not normalized to the canonical order.");
+    roundTrip.Scroll.HorizontalModifier = "ctrl+ctrl";
+    Assert(roundTrip.Scroll.HorizontalModifier == "shift",
+        "Duplicate modifier tokens were not rejected.");
+    roundTrip.Scroll.HorizontalModifier = "ctrl+A";
+    Assert(roundTrip.Scroll.HorizontalModifier == "shift",
+        "普通键不能作为滚轮修饰键。");
     roundTrip.Scroll.HorizontalModifier = "alt";
     roundTrip.Scroll.FastModifier = "alt";
     roundTrip.Normalize();
@@ -157,10 +166,10 @@ static void CheckSchema()
     Assert(new[] { "horizontalModifier", "fastModifier", "precisionModifier", "zoomModifier" }
             .All(name => scrollProperties.TryGetProperty(name, out _)),
         "Schema does not define all scroll modifiers.");
-    var modifiers = root.GetProperty("$defs").GetProperty("modifier").GetProperty("enum")
-        .EnumerateArray().Select(item => item.GetString()).ToArray();
-    Assert(modifiers.SequenceEqual(new[] { "none", "ctrl", "alt", "shift", "win" }),
-        "Schema modifier values are incorrect.");
+    var modifierSchema = root.GetProperty("$defs").GetProperty("modifier");
+    Assert(modifierSchema.GetProperty("type").GetString() == "string" &&
+           modifierSchema.GetProperty("pattern").GetString()!.Contains("ctrl|alt|shift|win"),
+        "Schema modifier combinations are incorrect.");
     var actionTypes = root.GetProperty("$defs").GetProperty("action").GetProperty("properties")
         .GetProperty("type").GetProperty("enum").EnumerateArray()
         .Select(item => item.GetString()).ToArray();
