@@ -4,14 +4,14 @@
 >
 > This document is provided in Chinese and English. If the two texts differ in meaning or interpretation, the Chinese version controls.
 
-Win Mouse Fix `0.1.0` 和 `0.1.1` 的默认许可只允许个人非商业使用。以下情况需要在使用前取得胡文凯的单独书面许可：
+Win Mouse Fix `0.1.0`、`0.1.1` 和 `0.1.2 Beta` 的默认许可只允许个人非商业使用。以下情况需要在使用前取得胡文凯的单独书面许可：
 
 - 企业、组织或个体经营者在工作中使用；
 - 将软件或修改版本用于收费产品、收费服务或营利活动；
 - 向客户、员工、合作方或公众分发程序；
 - 使用 Win Mouse Fix 名称、图标或其他品牌元素开展商业活动。
 
-The default license for Win Mouse Fix `0.1.0` and `0.1.1` permits personal, noncommercial use only. Separate written permission from Hu Wenkai is required before any of the following uses:
+The default license for Win Mouse Fix `0.1.0`, `0.1.1`, and `0.1.2 Beta` permits personal, noncommercial use only. Separate written permission from Hu Wenkai is required before any of the following uses:
 
 - use by a business, organization, or self-employed person in their work;
 - use of the software or a modified version in a paid product, paid service, or profit-making activity;

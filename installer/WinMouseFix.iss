@@ -1,12 +1,13 @@
 #define MyAppName "Win Mouse Fix"
-#define MyAppVersion "0.1.1"
+#define MyAppVersion "0.1.2"
+#define MyAppDisplayVersion "0.1.2 Beta"
 #define MyAppExeName "WinMouseFix.exe"
 
 [Setup]
 AppId={{5E15FC13-D79D-471D-B0E0-C347367A59C6}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
-AppVerName={#MyAppName} {#MyAppVersion}
+AppVerName={#MyAppName} {#MyAppDisplayVersion}
 AppPublisher=Hu Wenkai
 DefaultDirName={localappdata}\Programs\Win Mouse Fix
 DisableDirPage=no
@@ -17,13 +18,11 @@ ArchitecturesAllowed=x64os
 ArchitecturesInstallIn64BitMode=x64os
 MinVersion=10.0.19045
 OutputDir=..\dist
-OutputBaseFilename=WinMouseFix-Setup-{#MyAppVersion}
+OutputBaseFilename=WinMouseFix-Setup-0.1.2-beta
 SetupIconFile=..\assets\WinMouseFix.ico
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
-CloseApplications=yes
-CloseApplicationsFilter=WinMouseFix.exe,WinMouseFix.Engine.exe
 RestartApplications=no
 UninstallDisplayName={#MyAppName}
 UninstallDisplayIcon={app}\{#MyAppExeName}
@@ -80,10 +79,35 @@ begin
     ResultCode);
 end;
 
+procedure RequestApplicationShutdown;
+var
+  ResultCode: Integer;
+  ApplicationPath: String;
+begin
+  ApplicationPath := ExpandConstant('{app}\{#MyAppExeName}');
+  if FileExists(ApplicationPath) then
+  begin
+    Exec(
+      ApplicationPath,
+      '--shutdown',
+      ExpandConstant('{app}'),
+      SW_HIDE,
+      ewWaitUntilTerminated,
+      ResultCode);
+  end;
+end;
+
+procedure CloseRunningApplications;
+begin
+  RequestApplicationShutdown;
+  Sleep(5000);
+  StopApplication('{#MyAppExeName}');
+  StopApplication('WinMouseFix.Engine.exe');
+end;
+
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 begin
-  StopApplication('WinMouseFix.exe');
-  StopApplication('WinMouseFix.Engine.exe');
+  CloseRunningApplications;
   Result := '';
 end;
 
@@ -91,8 +115,7 @@ procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 begin
   if CurUninstallStep = usUninstall then
   begin
-    StopApplication('WinMouseFix.exe');
-    StopApplication('WinMouseFix.Engine.exe');
+    CloseRunningApplications;
     RegDeleteValue(
       HKCU,
       'Software\Microsoft\Windows\CurrentVersion\Run',

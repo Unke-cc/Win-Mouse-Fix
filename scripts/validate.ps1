@@ -97,26 +97,33 @@ if (Test-Path -LiteralPath $defaultConfig -PathType Leaf) {
         } elseif ($config.desktopSwipeDirection -ne "followMouse") {
             Add-CodeError "config/default.json must default desktopSwipeDirection to followMouse."
         } elseif ($null -eq $config.remaps -or @($config.remaps).Count -eq 0) {
-            Add-CodeError "config/default.json must contain recommended remaps."
+            Add-CodeError "config/default.json must contain mouse defaults."
         } else {
             $expectedRemaps = @(
-                "MButton|click|Original",
-                "MButton|holdScroll|FastScroll",
+                "XButton1|click|Back",
+                "XButton1|holdScroll|DesktopStartMenu",
+                "XButton1|holdDrag|DesktopNavigation",
                 "XButton2|click|Forward",
                 "XButton2|holdScroll|Zoom",
-                "XButton2|holdDrag|ScrollMove",
-                "XButton1|click|Back",
-                "XButton1|doubleClick|TaskView",
-                "XButton1|holdDrag|DesktopNavigation"
+                "XButton2|holdDrag|ScrollMove"
             )
             $actualRemaps = @($config.remaps | ForEach-Object {
                 "$($_.button)|$($_.trigger)|$($_.action.type)"
             })
             $missingRemaps = @($expectedRemaps | Where-Object { $actualRemaps -notcontains $_ })
-            if ($missingRemaps.Count -gt 0) {
-                Add-CodeError "config/default.json is missing recommended remaps: $($missingRemaps -join ', ')"
+            $modifierValues = @("none", "ctrl", "alt", "shift", "win")
+            $scrollModifiers = @(
+                $config.scroll.horizontalModifier,
+                $config.scroll.fastModifier,
+                $config.scroll.precisionModifier,
+                $config.scroll.zoomModifier
+            )
+            if ($actualRemaps.Count -ne $expectedRemaps.Count -or $missingRemaps.Count -gt 0) {
+                Add-CodeError "config/default.json does not match the five-or-more-button defaults."
+            } elseif (@($scrollModifiers | Where-Object { $modifierValues -notcontains $_ }).Count -gt 0) {
+                Add-CodeError "config/default.json has an invalid scroll modifier."
             } else {
-                Add-Note "Default configuration uses configVersion 2 and contains all recommended remaps."
+                Add-Note "Default configuration uses configVersion 2 with mouse defaults and scroll modifiers."
             }
         }
     } catch {
@@ -229,7 +236,7 @@ if ($null -eq $dotnetPath) {
                     if ($LASTEXITCODE -ne 0) {
                         Add-CodeError "Configuration migration check failed with exit code $LASTEXITCODE."
                     } else {
-                        Add-Note "Configuration migration and recommended settings check passed."
+                        Add-Note "Configuration migration, mouse defaults, and scroll modifiers check passed."
                     }
                 }
             }

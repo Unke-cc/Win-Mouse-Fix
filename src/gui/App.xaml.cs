@@ -1,3 +1,4 @@
+using System.IO;
 using System.Threading;
 using System.Windows;
 using WinMouseFix.Gui.Models;
@@ -8,9 +9,12 @@ public partial class App : System.Windows.Application
 {
     private const string InstanceMutexName = @"Local\WinMouseFix.Gui.Instance";
     private const string ActivationEventName = @"Local\WinMouseFix.Gui.Activate";
+    private const string ShutdownEventName = @"Local\WinMouseFix.Gui.Shutdown";
     private Mutex? instanceMutex;
     private EventWaitHandle? activationEvent;
+    private EventWaitHandle? shutdownEvent;
     private RegisteredWaitHandle? activationRegistration;
+    private RegisteredWaitHandle? shutdownRegistration;
     private bool ownsInstanceMutex;
 
     protected override void OnStartup(StartupEventArgs e)
@@ -33,6 +37,12 @@ public partial class App : System.Windows.Application
 
                 var optionsWindow = new ButtonOptionsWindow(new AppConfig());
                 optionsWindow.Close();
+                var profileWindow = new ProfileManagerWindow(
+                    new Services.ProfileService(Path.Combine(Path.GetTempPath(), "winmousefix-ui-check")),
+                    new AppConfig());
+                profileWindow.Close();
+                var defaultsWindow = new DefaultPresetWindow(Services.MouseDeviceType.FiveOrMore);
+                defaultsWindow.Close();
                 Shutdown(0);
             }
             catch
@@ -44,15 +54,27 @@ public partial class App : System.Windows.Application
         }
 
         var startInBackground = e.Args.Contains("--background", StringComparer.OrdinalIgnoreCase);
+        var shutdownRequested = e.Args.Contains("--shutdown", StringComparer.OrdinalIgnoreCase);
         activationEvent = new EventWaitHandle(false, EventResetMode.AutoReset, ActivationEventName);
+        shutdownEvent = new EventWaitHandle(false, EventResetMode.AutoReset, ShutdownEventName);
         instanceMutex = new Mutex(true, InstanceMutexName, out ownsInstanceMutex);
         if (!ownsInstanceMutex)
         {
-            if (!startInBackground)
+            if (shutdownRequested)
+            {
+                shutdownEvent.Set();
+            }
+            else if (!startInBackground)
             {
                 activationEvent.Set();
             }
 
+            Shutdown(0);
+            return;
+        }
+
+        if (shutdownRequested)
+        {
             Shutdown(0);
             return;
         }
@@ -80,13 +102,27 @@ public partial class App : System.Windows.Application
             null,
             Timeout.Infinite,
             executeOnlyOnce: false);
+        shutdownRegistration = ThreadPool.RegisterWaitForSingleObject(
+            shutdownEvent,
+            (_, _) =>
+            {
+                if (!Dispatcher.HasShutdownStarted)
+                {
+                    Dispatcher.BeginInvoke(mainWindow.RequestApplicationShutdown);
+                }
+            },
+            null,
+            Timeout.Infinite,
+            executeOnlyOnce: false);
         mainWindow.Show();
     }
 
     protected override void OnExit(ExitEventArgs e)
     {
         activationRegistration?.Unregister(null);
+        shutdownRegistration?.Unregister(null);
         activationEvent?.Dispose();
+        shutdownEvent?.Dispose();
         if (ownsInstanceMutex)
         {
             instanceMutex?.ReleaseMutex();

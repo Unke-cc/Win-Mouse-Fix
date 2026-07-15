@@ -2,19 +2,10 @@
   "configVersion": 2,
   "enabled": true,
   "pauseInFullscreen": true,
+  "receiveBetaUpdates": false,
   "doubleClickSpeed": "fast",
   "desktopSwipeDirection": "followMouse",
   "remaps": [
-    {
-      "button": "MButton",
-      "trigger": "click",
-      "action": { "type": "Original", "shortcut": "" }
-    },
-    {
-      "button": "MButton",
-      "trigger": "holdScroll",
-      "action": { "type": "FastScroll", "shortcut": "" }
-    },
     {
       "button": "XButton1",
       "trigger": "click",
@@ -22,8 +13,8 @@
     },
     {
       "button": "XButton1",
-      "trigger": "doubleClick",
-      "action": { "type": "TaskView", "shortcut": "" }
+      "trigger": "holdScroll",
+      "action": { "type": "DesktopStartMenu", "shortcut": "" }
     },
     {
       "button": "XButton1",
@@ -49,7 +40,11 @@
   "scroll": {
     "reverse": false,
     "speed": 1.0,
-    "smooth": false
+    "smooth": false,
+    "horizontalModifier": "shift",
+    "fastModifier": "alt",
+    "precisionModifier": "win",
+    "zoomModifier": "ctrl"
   },
   "excludedApps": [],
   "startup": {

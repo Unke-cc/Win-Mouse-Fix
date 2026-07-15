@@ -7,6 +7,7 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="System.Net.Http" />
     <ProjectReference Include="..\..\src\gui\WinMouseFix.Gui.csproj" />
     <None Include="..\..\config\default.json" Link="default.json" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\src\shared\config.schema.json" Link="config.schema.json" CopyToOutputDirectory="PreserveNewest" />

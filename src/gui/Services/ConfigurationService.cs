@@ -51,7 +51,10 @@ public sealed class ConfigurationService
                 var legacy = document.RootElement.Deserialize<LegacyAppConfig>(JsonOptions)
                              ?? new LegacyAppConfig();
                 var migrated = MigrateLegacyConfig(legacy);
-                TrySaveMigrated(migrated);
+                if (PreserveLegacyConfig())
+                {
+                    TrySaveMigrated(migrated);
+                }
                 return Task.FromResult(migrated);
             }
 
@@ -112,6 +115,30 @@ public sealed class ConfigurationService
         catch (IOException)
         {
             // The default configuration remains usable even if a backup cannot be created.
+        }
+    }
+
+    private bool PreserveLegacyConfig()
+    {
+        try
+        {
+            var stem = Path.Combine(ConfigDirectory, $"config.v1-{DateTime.Now:yyyyMMdd-HHmmssfff}");
+            var backupPath = stem + ".json";
+            for (var suffix = 2; File.Exists(backupPath); suffix++)
+            {
+                backupPath = $"{stem}-{suffix}.json";
+            }
+
+            File.Copy(ConfigPath, backupPath);
+            return true;
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return false;
         }
     }
 

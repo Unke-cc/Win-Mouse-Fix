@@ -39,8 +39,14 @@ class ConfigManager {
         "CustomShortcut", true,
         "FastScroll", true,
         "Zoom", true,
+        "VolumeControl", true,
+        "TabNavigation", true,
+        "BrowserNavigation", true,
+        "DesktopSwitch", true,
+        "DesktopStartMenu", true,
         "ScrollMove", true,
-        "DesktopNavigation", true
+        "DesktopNavigation", true,
+        "BrowserTabNavigation", true
     )
 
     __New(defaultPath, userPath) {
@@ -162,9 +168,19 @@ class ConfigManager {
             }
             action := item.Has("action") ? this.NormalizeAction(item["action"], Map("type", "None", "shortcut", ""))
                 : Map("type", "None", "shortcut", "")
-            result.Push(Map("button", button, "trigger", trigger, "action", action))
+            this.AddOrReplaceRemap(&result, Map("button", button, "trigger", trigger, "action", action))
         }
         return result
+    }
+
+    AddOrReplaceRemap(&remaps, remap) {
+        for index, existing in remaps {
+            if existing["button"] = remap["button"] && existing["trigger"] = remap["trigger"] {
+                remaps[index] := remap
+                return
+            }
+        }
+        remaps.Push(remap)
     }
 
     ConvertLegacyButtons(buttons) {
@@ -238,11 +254,38 @@ class ConfigManager {
     }
 
     NormalizeScroll(source) {
+        modifiers := Map(
+            "horizontalModifier", this.NormalizeModifier(this.ReadString(source, "horizontalModifier", "shift"), "shift"),
+            "fastModifier", this.NormalizeModifier(this.ReadString(source, "fastModifier", "alt"), "alt"),
+            "precisionModifier", this.NormalizeModifier(this.ReadString(source, "precisionModifier", "win"), "win"),
+            "zoomModifier", this.NormalizeModifier(this.ReadString(source, "zoomModifier", "ctrl"), "ctrl")
+        )
+        used := Map()
+        for name in ["horizontalModifier", "fastModifier", "precisionModifier", "zoomModifier"] {
+            modifier := modifiers[name]
+            if modifier != "none" {
+                if used.Has(modifier) {
+                    modifiers[name] := "none"
+                } else {
+                    used[modifier] := true
+                }
+            }
+        }
         return Map(
             "reverse", this.ReadBoolean(source, "reverse", false),
             "speed", this.ReadNumber(source, "speed", 1.0, 0.25, 4.0),
-            "smooth", this.ReadBoolean(source, "smooth", false)
+            "smooth", this.ReadBoolean(source, "smooth", false),
+            "horizontalModifier", modifiers["horizontalModifier"],
+            "fastModifier", modifiers["fastModifier"],
+            "precisionModifier", modifiers["precisionModifier"],
+            "zoomModifier", modifiers["zoomModifier"]
         )
+    }
+
+    NormalizeModifier(value, fallback) {
+        value := StrLower(Trim(value))
+        return value = "none" || value = "ctrl" || value = "alt" || value = "shift" || value = "win"
+            ? value : fallback
     }
 
     NormalizeExcludedApps(source) {
@@ -267,10 +310,8 @@ class ConfigManager {
 
     CreateBuiltInDefaults() {
         remaps := []
-        this.AddDefault(&remaps, "MButton", "click", "Original")
-        this.AddDefault(&remaps, "MButton", "holdScroll", "FastScroll")
         this.AddDefault(&remaps, "XButton1", "click", "Back")
-        this.AddDefault(&remaps, "XButton1", "doubleClick", "TaskView")
+        this.AddDefault(&remaps, "XButton1", "holdScroll", "DesktopStartMenu")
         this.AddDefault(&remaps, "XButton1", "holdDrag", "DesktopNavigation")
         this.AddDefault(&remaps, "XButton2", "click", "Forward")
         this.AddDefault(&remaps, "XButton2", "holdScroll", "Zoom")
@@ -282,7 +323,15 @@ class ConfigManager {
             "doubleClickSpeed", "fast",
             "desktopSwipeDirection", "followMouse",
             "remaps", remaps,
-            "scroll", Map("reverse", false, "speed", 1.0, "smooth", false),
+            "scroll", Map(
+                "reverse", false,
+                "speed", 1.0,
+                "smooth", false,
+                "horizontalModifier", "shift",
+                "fastModifier", "alt",
+                "precisionModifier", "win",
+                "zoomModifier", "ctrl"
+            ),
             "excludedApps", [],
             "startup", Map("runAtLogin", false),
             "timing", Map("multiClickMs", 150, "holdMs", 500, "dragThresholdPx", 12)

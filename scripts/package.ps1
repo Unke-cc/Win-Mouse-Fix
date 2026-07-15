@@ -9,7 +9,7 @@ $ErrorActionPreference = "Stop"
 
 $repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $installerScript = Join-Path $repositoryRoot "installer\WinMouseFix.iss"
-$expectedOutput = Join-Path $repositoryRoot "dist\WinMouseFix-Setup-0.1.1.exe"
+$expectedOutput = Join-Path $repositoryRoot "dist\WinMouseFix-Setup-0.1.2-beta.exe"
 
 & (Join-Path $PSScriptRoot "build.ps1") -Configuration $Configuration
 if ($LASTEXITCODE -ne 0) {

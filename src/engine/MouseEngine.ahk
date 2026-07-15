@@ -67,6 +67,15 @@ class WinMouseFixEngine {
             || this.actionManager.DesktopNavigationShortcut("right", "oppositeMouse") != "^#{Right}" {
             throw Error("Desktop navigation direction check failed.")
         }
+        if this.actionManager.DesktopSwitchShortcut("left") != "^#{Left}"
+            || this.actionManager.DesktopSwitchShortcut("right") != "^#{Right}" {
+            throw Error("Desktop switch shortcut check failed.")
+        }
+        if !this.appRuleManager.IsDesktopSurfaceClass("Progman")
+            || !this.appRuleManager.IsDesktopSurfaceClass("WorkerW")
+            || this.appRuleManager.IsDesktopSurfaceClass("Chrome_WidgetWin_1") {
+            throw Error("Desktop surface class check failed.")
+        }
         fallbackConfig := this.configManager.Normalize(Map(
             "timing", Map("holdMs", "invalid", "dragThresholdPx", "invalid")
         ))
@@ -76,6 +85,11 @@ class WinMouseFixEngine {
         }
         if MouseManager.ResolveClickAction(Map("type", "None", "shortcut", ""))["type"] != "Original" {
             throw Error("Unmapped click fallback self-check failed.")
+        }
+        if !MouseManager.ShouldResetStaleButton(Map("isDown", true), false)
+            || MouseManager.ShouldResetStaleButton(Map("isDown", true), true)
+            || MouseManager.ShouldResetStaleButton(Map("isDown", false), false) {
+            throw Error("Mouse button state recovery check failed.")
         }
         return true
     }

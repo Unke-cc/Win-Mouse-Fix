@@ -19,6 +19,7 @@
     "configVersion": { "const": 2 },
     "enabled": { "type": "boolean" },
     "pauseInFullscreen": { "type": "boolean" },
+    "receiveBetaUpdates": { "type": "boolean", "default": false },
     "doubleClickSpeed": { "enum": ["fast", "medium", "slow"] },
     "desktopSwipeDirection": { "enum": ["followMouse", "oppositeMouse"] },
     "remaps": {
@@ -32,7 +33,11 @@
       "properties": {
         "reverse": { "type": "boolean" },
         "speed": { "type": "number", "minimum": 0.25, "maximum": 4.0 },
-        "smooth": { "type": "boolean" }
+        "smooth": { "type": "boolean" },
+        "horizontalModifier": { "$ref": "#/$defs/modifier" },
+        "fastModifier": { "$ref": "#/$defs/modifier" },
+        "precisionModifier": { "$ref": "#/$defs/modifier" },
+        "zoomModifier": { "$ref": "#/$defs/modifier" }
       }
     },
     "excludedApps": {
@@ -112,13 +117,22 @@
             "MediaPlayPause",
             "FastScroll",
             "Zoom",
+            "VolumeControl",
+            "TabNavigation",
+            "BrowserNavigation",
+            "DesktopSwitch",
+            "DesktopStartMenu",
             "ScrollMove",
             "DesktopNavigation",
+            "BrowserTabNavigation",
             "CustomShortcut"
           ]
         },
         "shortcut": { "type": "string" }
       }
+    },
+    "modifier": {
+      "enum": ["none", "ctrl", "alt", "shift", "win"]
     }
   }
 }

@@ -128,16 +128,10 @@ foreach ($licenseFile in $licenseFiles) {
 
 Copy-Item -LiteralPath $thirdPartyLicenseRoot -Destination (Join-Path $appOutput "third-party-licenses") -Recurse -Force
 
-$assetsRoot = Join-Path $repositoryRoot "assets"
-if (Test-Path -LiteralPath $assetsRoot -PathType Container) {
-    Copy-Item -LiteralPath $assetsRoot -Destination (Join-Path $appOutput "assets") -Recurse -Force
-}
-
 $guiBytes = (Get-ChildItem -LiteralPath $appOutput -File -Recurse | Where-Object {
     $relativePath = Get-RelativePath -BasePath $appOutput -Path $_.FullName
     $relativePath -ne "WinMouseFix.Engine.exe" -and
-        -not $relativePath.StartsWith("config\", [System.StringComparison]::OrdinalIgnoreCase) -and
-        -not $relativePath.StartsWith("assets\", [System.StringComparison]::OrdinalIgnoreCase)
+        -not $relativePath.StartsWith("config\", [System.StringComparison]::OrdinalIgnoreCase)
 } | Measure-Object -Property Length -Sum).Sum
 $guiMiB = $guiBytes / 1MB
 Write-Host ("GUI payload: {0:N2} MiB" -f $guiMiB) -ForegroundColor Cyan

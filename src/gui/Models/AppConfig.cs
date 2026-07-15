@@ -10,9 +10,10 @@ public sealed class AppConfig : BindableBase
     private int configVersion = CurrentVersion;
     private bool enabled = true;
     private bool pauseInFullscreen = true;
+    private bool receiveBetaUpdates;
     private string doubleClickSpeed = "fast";
     private string desktopSwipeDirection = "followMouse";
-    private ObservableCollection<RemapConfig> remaps = CreateRecommendedRemaps();
+    private ObservableCollection<RemapConfig> remaps = CreateFiveOrMoreRemaps();
     private ScrollConfig scroll = new();
     private ObservableCollection<ExcludedApp> excludedApps = [];
     private StartupConfig startup = new();
@@ -33,6 +34,12 @@ public sealed class AppConfig : BindableBase
     {
         get => pauseInFullscreen;
         set => SetProperty(ref pauseInFullscreen, value);
+    }
+
+    public bool ReceiveBetaUpdates
+    {
+        get => receiveBetaUpdates;
+        set => SetProperty(ref receiveBetaUpdates, value);
     }
 
     public string DoubleClickSpeed
@@ -90,7 +97,11 @@ public sealed class AppConfig : BindableBase
             }
         }
 
+        RemoveDuplicateRemaps();
+        MigrateDirectionalScrollRemaps();
+
         Scroll ??= new ScrollConfig();
+        Scroll.Normalize();
         ExcludedApps ??= [];
         for (var index = ExcludedApps.Count - 1; index >= 0; index--)
         {
@@ -103,26 +114,92 @@ public sealed class AppConfig : BindableBase
         Startup ??= new StartupConfig();
     }
 
-    public void RestoreRecommendedRemaps()
+    public void RestoreDefaultRemaps(bool threeButtonMouse)
     {
         Remaps.Clear();
-        foreach (var remap in CreateRecommendedRemaps())
+        var defaults = threeButtonMouse ? CreateThreeButtonRemaps() : CreateFiveOrMoreRemaps();
+        foreach (var remap in defaults)
         {
             Remaps.Add(remap);
         }
     }
 
-    public static ObservableCollection<RemapConfig> CreateRecommendedRemaps() =>
+    public static ObservableCollection<RemapConfig> CreateThreeButtonRemaps() =>
     [
-        RemapConfig.Create("MButton", "click", "Original"),
-        RemapConfig.Create("MButton", "holdScroll", "FastScroll"),
+        RemapConfig.Create("MButton", "click", "MiddleClick"),
+        RemapConfig.Create("MButton", "hold", "ShowDesktop"),
+        RemapConfig.Create("MButton", "doubleClick", "StartMenu"),
+        RemapConfig.Create("MButton", "holdDrag", "DesktopNavigation")
+    ];
+
+    public static ObservableCollection<RemapConfig> CreateFiveOrMoreRemaps() =>
+    [
         RemapConfig.Create("XButton1", "click", "Back"),
-        RemapConfig.Create("XButton1", "doubleClick", "TaskView"),
+        RemapConfig.Create("XButton1", "holdScroll", "DesktopStartMenu"),
         RemapConfig.Create("XButton1", "holdDrag", "DesktopNavigation"),
         RemapConfig.Create("XButton2", "click", "Forward"),
         RemapConfig.Create("XButton2", "holdScroll", "Zoom"),
         RemapConfig.Create("XButton2", "holdDrag", "ScrollMove")
     ];
+
+    private void MigrateDirectionalScrollRemaps()
+    {
+        foreach (var wheelUp in Remaps.Where(item => item.Trigger == "wheelUp").ToArray())
+        {
+            var wheelDown = Remaps.FirstOrDefault(item =>
+                string.Equals(item.Button, wheelUp.Button, StringComparison.OrdinalIgnoreCase) &&
+                item.Trigger == "wheelDown");
+            if (wheelDown is null || Remaps.Any(item =>
+                    string.Equals(item.Button, wheelUp.Button, StringComparison.OrdinalIgnoreCase) &&
+                    item.Trigger == "holdScroll"))
+            {
+                continue;
+            }
+
+            var mergedAction = CreateHoldScrollAction(wheelUp.Action, wheelDown.Action);
+            if (mergedAction is null)
+            {
+                continue;
+            }
+
+            wheelUp.Trigger = "holdScroll";
+            wheelUp.Action = mergedAction;
+            Remaps.Remove(wheelDown);
+        }
+    }
+
+    private static ActionConfig? CreateHoldScrollAction(ActionConfig up, ActionConfig down)
+    {
+        if (string.Equals(up.Type, down.Type, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(up.Shortcut, down.Shortcut, StringComparison.Ordinal))
+        {
+            return up.Clone();
+        }
+
+        var type = (up.Type, down.Type) switch
+        {
+            ("VolumeUp", "VolumeDown") => "VolumeControl",
+            ("PreviousTab", "NextTab") => "TabNavigation",
+            ("Back", "Forward") => "BrowserNavigation",
+            ("DesktopLeft", "DesktopRight") => "DesktopSwitch",
+            ("ShowDesktop", "StartMenu") => "DesktopStartMenu",
+            _ => null
+        };
+        return type is null ? null : ActionConfig.Create(type);
+    }
+
+    private void RemoveDuplicateRemaps()
+    {
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        for (var index = Remaps.Count - 1; index >= 0; index--)
+        {
+            var remap = Remaps[index];
+            if (!seen.Add($"{remap.Button}\u001f{remap.Trigger}"))
+            {
+                Remaps.RemoveAt(index);
+            }
+        }
+    }
 
     internal static bool IsDesktopSwipeDirection(string? value) =>
         value is "followMouse" or "oppositeMouse";
@@ -182,21 +259,27 @@ public sealed class RemapConfig : BindableBase
         Action ??= new ActionConfig();
     }
 
-    public static RemapConfig Create(string button, string trigger, string actionType) => new()
+    public static RemapConfig Create(string button, string trigger, string actionType)
     {
-        Button = button,
-        Trigger = trigger,
-        Action = ActionConfig.Create(actionType)
-    };
+        var remap = new RemapConfig
+        {
+            Button = button,
+            Trigger = trigger,
+            Action = ActionConfig.Create(actionType)
+        };
+        remap.Normalize();
+        return remap;
+    }
 
     public static RemapConfig Create(string button, string trigger) =>
         Create(button, trigger, (button, trigger) switch
         {
             ("XButton1", "click") => "Back",
             ("XButton2", "click") => "Forward",
+            ("XButton1", "holdScroll") => "DesktopStartMenu",
             ("XButton1", "holdDrag") => "DesktopNavigation",
             ("XButton2", "holdScroll") => "Zoom",
-            (_, "holdScroll") => "FastScroll",
+            (_, "holdScroll") => "DesktopStartMenu",
             (_, "holdDrag") => "ScrollMove",
             _ => "TaskView"
         });
@@ -206,14 +289,14 @@ public sealed class RemapConfig : BindableBase
         "click" => 0,
         "hold" => 1,
         "doubleClick" => 2,
-        "holdDrag" => 3,
-        "holdScroll" => 4,
-        "dragUp" => 5,
-        "dragDown" => 6,
-        "dragLeft" => 7,
-        "dragRight" => 8,
-        "wheelUp" => 9,
-        "wheelDown" => 10,
+        "holdScroll" => 3,
+        "holdDrag" => 4,
+        "wheelUp" => 5,
+        "wheelDown" => 6,
+        "dragUp" => 7,
+        "dragDown" => 8,
+        "dragLeft" => 9,
+        "dragRight" => 10,
         _ => 11
     };
 }
@@ -236,6 +319,12 @@ public sealed class ActionConfig : BindableBase
     }
 
     public static ActionConfig Create(string type) => new() { Type = type };
+
+    public ActionConfig Clone() => new()
+    {
+        Type = Type,
+        Shortcut = Shortcut
+    };
 }
 
 public sealed class ScrollConfig : BindableBase
@@ -243,6 +332,10 @@ public sealed class ScrollConfig : BindableBase
     private bool reverse;
     private double speed = 1.0;
     private bool smooth;
+    private string horizontalModifier = "shift";
+    private string fastModifier = "alt";
+    private string precisionModifier = "win";
+    private string zoomModifier = "ctrl";
 
     public bool Reverse
     {
@@ -260,6 +353,53 @@ public sealed class ScrollConfig : BindableBase
     {
         get => smooth;
         set => SetProperty(ref smooth, value);
+    }
+
+    public string HorizontalModifier
+    {
+        get => horizontalModifier;
+        set => SetProperty(ref horizontalModifier, NormalizeModifier(value, "shift"));
+    }
+
+    public string FastModifier
+    {
+        get => fastModifier;
+        set => SetProperty(ref fastModifier, NormalizeModifier(value, "alt"));
+    }
+
+    public string PrecisionModifier
+    {
+        get => precisionModifier;
+        set => SetProperty(ref precisionModifier, NormalizeModifier(value, "win"));
+    }
+
+    public string ZoomModifier
+    {
+        get => zoomModifier;
+        set => SetProperty(ref zoomModifier, NormalizeModifier(value, "ctrl"));
+    }
+
+    public void Normalize()
+    {
+        HorizontalModifier = HorizontalModifier;
+        FastModifier = FastModifier;
+        PrecisionModifier = PrecisionModifier;
+        ZoomModifier = ZoomModifier;
+
+        var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        HorizontalModifier = KeepUnique(HorizontalModifier, used);
+        FastModifier = KeepUnique(FastModifier, used);
+        PrecisionModifier = KeepUnique(PrecisionModifier, used);
+        ZoomModifier = KeepUnique(ZoomModifier, used);
+    }
+
+    private static string KeepUnique(string modifier, ISet<string> used) =>
+        modifier == "none" || used.Add(modifier) ? modifier : "none";
+
+    private static string NormalizeModifier(string? value, string fallback)
+    {
+        var normalized = value?.Trim().ToLowerInvariant();
+        return normalized is "none" or "ctrl" or "alt" or "shift" or "win" ? normalized : fallback;
     }
 }
 

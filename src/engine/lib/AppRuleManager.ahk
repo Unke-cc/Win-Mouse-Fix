@@ -58,7 +58,11 @@ class AppRuleManager {
 
     IsFullscreenWindow(hwnd) {
         try {
-            if WinGetMinMax("ahk_id " hwnd) = -1 {
+            windowClass := WinGetClass("ahk_id " hwnd)
+            if this.IsDesktopSurfaceClass(windowClass) {
+                return false
+            }
+            if WinGetMinMax("ahk_id " hwnd) != 0 {
                 return false
             }
             WinGetPos(&windowLeft, &windowTop, &windowWidth, &windowHeight, "ahk_id " hwnd)
@@ -85,6 +89,15 @@ class AppRuleManager {
                 && windowTop + windowHeight >= monitorBottom - tolerance
         }
         return false
+    }
+
+    IsDesktopSurfaceClass(windowClass) {
+        return windowClass = "Progman"
+            || windowClass = "WorkerW"
+            || windowClass = "Shell_TrayWnd"
+            || windowClass = "Shell_SecondaryTrayWnd"
+            || windowClass = "MultitaskingViewFrame"
+            || windowClass = "XamlExplorerHostIslandWindow"
     }
 
     PathsEqual(leftPath, rightPath) {

@@ -1,6 +1,6 @@
 # 发布与安装
 
-本文说明 Win Mouse Fix MVP 安装程序的生成、安装、更新、卸载和发布检查。当前安装包版本为 `0.1.1`，目标系统为 Windows 11 x64，并兼容 Windows 10 22H2 x64。
+本文说明 Win Mouse Fix MVP 安装程序的生成、安装、更新、卸载和发布检查。当前安装包版本为 `0.1.2 Beta`，目标系统为 Windows 11 x64，并兼容 Windows 10 22H2 x64。
 
 ## 生成安装程序
 
@@ -14,9 +14,9 @@
 成功后得到：
 
 - `dist/app/`：便携运行目录。
-- `dist/WinMouseFix-Setup-0.1.1.exe`：当前用户安装程序。
+- `dist/WinMouseFix-Setup-0.1.2-beta.exe`：当前用户安装程序。
 
-`package.ps1` 会先重新生成 `dist/app`。构建期间会检查 GUI 主程序及其依赖不超过 10 MiB；鼠标核心、`config/` 和 `assets/` 不计入该数值。
+`package.ps1` 会先重新生成 `dist/app`。构建期间会检查 GUI 主程序及其依赖不超过 10 MiB；鼠标核心和 `config/` 不计入该数值。界面图标已嵌入 GUI，不在发布目录重复保存。
 
 ## 安装行为
 
@@ -34,15 +34,17 @@
 
 发布新版本时，需要同时修改 `installer/WinMouseFix.iss` 中的版本号，以及 `scripts/package.ps1` 中的预期输出文件名。
 
-## GitHub Releases 更新检查
+## GitHub 与 Gitee 更新检查
 
-“关于”页的“检查更新”直接读取 `Unke-cc/Win-Mouse-Fix` 的最新 GitHub Release，不需要自建服务器。发布时使用 `v0.1.1` 这类可被 `Version` 识别的 tag，并上传对应安装程序；发现更高版本后，应用会询问用户是否打开该 Release 的下载页面。
+“关于”页默认只检查正式版本；勾选“获取 Beta 版更新”后，同时接受预发布版本。程序先在 3 秒内读取 GitHub `Unke-cc/Win-Mouse-Fix` 的 Release 列表，连接或数据读取失败后改查 Gitee `unkecc/Win-Mouse-Fix`；关于页的项目主页、许可和更新页面始终使用本次可访问的同一来源。
+
+GitHub 和 Gitee 应使用相同的 `v0.1.2-beta` tag，并上传同一份安装程序。正式版不能标记为预发布；Beta 版必须标记为预发布。`v0.1.2-beta.2` 高于 `v0.1.2-beta.1`，同版本正式版高于 Beta。发现更高版本后，应用会显示来源并询问用户是否打开对应 Release 页面。
 
 当前功能只检查和打开下载页面，不会在后台安装新版本。
 
 ## 发布检查
 
-发布前完整执行 [MVP 手动检查清单](../tests/manual/mvp-checklist.md)，至少确认：
+发布前完整执行 [MVP 手动检查清单](../tests/manual/mvp-checklist.md) 和 [0.1.2 Beta 更新检查清单](../tests/manual/v0.1.2-beta-update-checklist.md)，至少确认：
 
 1. Windows 10 22H2 x64 和 Windows 11 x64 均可安装和启动。
 2. 普通重复启动只显示已有窗口，`--background` 只进入托盘。

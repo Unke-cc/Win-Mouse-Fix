@@ -2,8 +2,8 @@ using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
-using System.Net;
 using System.Net.Http;
+using System.Reflection;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Input;
@@ -19,13 +19,12 @@ namespace WinMouseFix.Gui;
 
 public partial class MainWindow : Window
 {
-    private const string ProjectHomepageUrl = "https://github.com/Unke-cc/Win-Mouse-Fix";
-    private const string LicenseUrl = ProjectHomepageUrl + "/blob/main/LICENSE.md";
-    private const string LatestReleaseApiUrl = "https://api.github.com/repos/Unke-cc/Win-Mouse-Fix/releases/latest";
-    private static readonly HttpClient UpdateHttpClient = new() { Timeout = TimeSpan.FromSeconds(10) };
     private readonly ConfigurationService configurationService = new();
     private readonly CoreProcessService coreProcessService = new();
+    private readonly ProfileService profileService = new();
+    private readonly MouseDeviceService mouseDeviceService = new();
     private readonly StartupService startupService = new();
+    private readonly UpdateService updateService = new();
     private readonly DispatcherTimer saveTimer;
     private readonly DispatcherTimer statusTimer;
     private readonly DispatcherTimer captureClickTimer;
@@ -54,6 +53,8 @@ public partial class MainWindow : Window
     private FrameworkElement? activePage;
     private int resizeVersion;
     private bool centerWindowAfterInitialResize = true;
+    private UpdateSource? aboutSource;
+    private bool aboutSourceResolved;
 
     internal bool StartHidden { get; set; }
 
@@ -124,14 +125,43 @@ public partial class MainWindow : Window
 
     private async void Window_Loaded(object sender, RoutedEventArgs e)
     {
-        config = await configurationService.LoadAsync();
+        string? loadError = null;
+        string? defaultMessage = null;
+        try
+        {
+            var firstRun = !File.Exists(configurationService.ConfigPath) &&
+                           (!Directory.Exists(profileService.ProfilesDirectory) ||
+                            !Directory.EnumerateFiles(profileService.ProfilesDirectory, "config.json", SearchOption.AllDirectories).Any());
+            config = (await profileService.InitializeAsync()).Config;
+            if (firstRun)
+            {
+                var detectedType = mouseDeviceService.Detect();
+                config.RestoreDefaultRemaps(detectedType == MouseDeviceType.ThreeButton);
+                defaultMessage = detectedType == MouseDeviceType.ThreeButton
+                    ? "已识别为三键鼠标，并应用对应默认值"
+                    : "已识别为五键或多键鼠标，并应用对应默认值";
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or JsonException)
+        {
+            config = new AppConfig();
+            loadError = "无法读取已保存的配置，当前使用默认设置。";
+        }
         lastSavedConfig = CloneConfig(config);
         DataContext = config;
         SubscribeToConfig(config);
         ConfigPathText.Text = configurationService.ConfigPath;
-        AboutVersionText.Text = $"版本 {typeof(MainWindow).Assembly.GetName().Version?.ToString(3) ?? "1.0.0"}";
+        AboutVersionText.Text = $"版本 {GetCurrentReleaseVersion()}";
         loading = false;
         await SaveConfigurationAsync(showConfirmation: false);
+        if (loadError is not null)
+        {
+            ShowStatus(loadError);
+        }
+        else if (defaultMessage is not null)
+        {
+            ShowStatus(defaultMessage);
+        }
 
         GeneralNavigation.IsChecked = true;
         UpdateApplicationEmptyState();
@@ -218,6 +248,11 @@ public partial class MainWindow : Window
             }
         }
 
+        if (!loading && sender == config.Scroll && IsModifierProperty(e.PropertyName))
+        {
+            RejectDuplicateModifier(e.PropertyName!);
+        }
+
         UpdateTrayMenu();
         ScheduleSave();
     }
@@ -276,7 +311,7 @@ public partial class MainWindow : Window
         await saveLock.WaitAsync();
         try
         {
-            await configurationService.SaveAsync(config);
+            await profileService.SaveCurrentAsync(config);
             lastSavedConfig = CloneConfig(config);
             if (showConfirmation)
             {
@@ -318,9 +353,15 @@ public partial class MainWindow : Window
             ownedWindow.Close();
         }
 
+        ReplaceConfiguration(lastSavedConfig);
+    }
+
+    private void ReplaceConfiguration(AppConfig replacement)
+    {
         loading = true;
         UnsubscribeFromConfig(config);
-        config = CloneConfig(lastSavedConfig);
+        config = CloneConfig(replacement);
+        lastSavedConfig = CloneConfig(config);
         DataContext = config;
         SubscribeToConfig(config);
         loading = false;
@@ -333,6 +374,7 @@ public partial class MainWindow : Window
             SetAppEnabled(config.Enabled, showMessage: false);
         }
         UpdateCoreStatus();
+        Dispatcher.BeginInvoke(ResizeWindowForActivePage, DispatcherPriority.Loaded);
     }
 
     private void Navigation_Checked(object sender, RoutedEventArgs e)
@@ -351,6 +393,10 @@ public partial class MainWindow : Window
             sender == ButtonsNavigation ? ButtonsPage :
             sender == ScrollNavigation ? ScrollPage : AboutPage;
         Dispatcher.BeginInvoke(ResizeWindowForActivePage, DispatcherPriority.Loaded);
+        if (sender == AboutNavigation)
+        {
+            _ = ResolveAboutSourceAsync();
+        }
     }
 
     private void ResizeWindowForActivePage()
@@ -555,7 +601,7 @@ public partial class MainWindow : Window
         }
 
         var current = e.GetPosition(CaptureArea);
-        if (!capturedScroll && !capturedDrag &&
+        if (!holdCaptured && !capturedScroll && !capturedDrag &&
             (Math.Abs(current.X - captureOrigin.X) >= 12 || Math.Abs(current.Y - captureOrigin.Y) >= 12))
         {
             capturedDrag = true;
@@ -571,11 +617,11 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (!capturedScroll)
+        if (!holdCaptured && !capturedDrag && !capturedScroll)
         {
             capturedScroll = true;
             UpgradeCapturedGesture("holdScroll");
-            CaptureStateText.Text = "已识别点击并滚动";
+            CaptureStateText.Text = "已识别按住并滚动";
         }
         e.Handled = true;
     }
@@ -656,11 +702,6 @@ public partial class MainWindow : Window
     private void UpgradeCapturedGesture(string trigger)
     {
         if (capturedButton is null || string.Equals(capturedGestureTrigger, trigger, StringComparison.Ordinal))
-        {
-            return;
-        }
-
-        if (capturedGestureTrigger == "holdScroll")
         {
             return;
         }
@@ -815,26 +856,92 @@ public partial class MainWindow : Window
         return null;
     }
 
-    private void RestoreRecommended_Click(object sender, RoutedEventArgs e)
+    private void RestoreDefaults_Click(object sender, RoutedEventArgs e)
     {
-        if (System.Windows.MessageBox.Show(this,
-                "恢复推荐设置会替换当前全部按钮映射。是否继续？",
-                "恢复推荐设置",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Question) != MessageBoxResult.Yes)
+        var dialog = new DefaultPresetWindow(mouseDeviceService.Detect()) { Owner = this };
+        if (dialog.ShowDialog() != true || !dialog.SelectedPreset.HasValue)
         {
             return;
         }
 
-        config.RestoreRecommendedRemaps();
+        config.RestoreDefaultRemaps(dialog.SelectedPreset == MouseDeviceType.ThreeButton);
         BindRemapsCollection();
-        ShowStatus("已恢复推荐设置");
+        ShowStatus(dialog.SelectedPreset == MouseDeviceType.ThreeButton
+            ? "已恢复三键鼠标默认值"
+            : "已恢复五键或多键鼠标默认值");
         Dispatcher.BeginInvoke(ResizeWindowForActivePage, DispatcherPriority.Loaded);
+    }
+
+    private void ModifierComboBox_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        if (sender is System.Windows.Controls.ComboBox { IsDropDownOpen: false })
+        {
+            e.Handled = true;
+        }
+    }
+
+    private static bool IsModifierProperty(string? propertyName) => propertyName is
+        nameof(ScrollConfig.HorizontalModifier) or nameof(ScrollConfig.FastModifier) or
+        nameof(ScrollConfig.PrecisionModifier) or nameof(ScrollConfig.ZoomModifier);
+
+    private void RejectDuplicateModifier(string propertyName)
+    {
+        var selected = propertyName switch
+        {
+            nameof(ScrollConfig.HorizontalModifier) => config.Scroll.HorizontalModifier,
+            nameof(ScrollConfig.FastModifier) => config.Scroll.FastModifier,
+            nameof(ScrollConfig.PrecisionModifier) => config.Scroll.PrecisionModifier,
+            nameof(ScrollConfig.ZoomModifier) => config.Scroll.ZoomModifier,
+            _ => "none"
+        };
+        if (selected == "none")
+        {
+            return;
+        }
+
+        var assignedCount = new[]
+        {
+            config.Scroll.HorizontalModifier,
+            config.Scroll.FastModifier,
+            config.Scroll.PrecisionModifier,
+            config.Scroll.ZoomModifier
+        }.Count(value => value == selected);
+        if (assignedCount < 2)
+        {
+            return;
+        }
+
+        loading = true;
+        switch (propertyName)
+        {
+            case nameof(ScrollConfig.HorizontalModifier): config.Scroll.HorizontalModifier = "none"; break;
+            case nameof(ScrollConfig.FastModifier): config.Scroll.FastModifier = "none"; break;
+            case nameof(ScrollConfig.PrecisionModifier): config.Scroll.PrecisionModifier = "none"; break;
+            case nameof(ScrollConfig.ZoomModifier): config.Scroll.ZoomModifier = "none"; break;
+        }
+        loading = false;
+        ShowStatus("该修饰键已用于其他滚轮动作，本项已设为关闭");
     }
 
     private void OpenButtonOptions_Click(object sender, RoutedEventArgs e)
     {
         new ButtonOptionsWindow(config) { Owner = this }.ShowDialog();
+    }
+
+    private async void OpenProfileManager_Click(object sender, RoutedEventArgs e)
+    {
+        saveTimer.Stop();
+        await SaveConfigurationAsync(showConfirmation: false);
+        var window = new ProfileManagerWindow(profileService, config) { Owner = this };
+        window.ShowDialog();
+        if (!window.ConfigurationChanged)
+        {
+            return;
+        }
+
+        ReplaceConfiguration(window.CurrentConfig);
+        await SaveConfigurationAsync(showConfirmation: false);
+        ShowStatus("配置已切换并应用");
     }
 
     private static string? GetButtonName(MouseButton button) => button switch
@@ -858,8 +965,10 @@ public partial class MainWindow : Window
         "click" => "点击",
         "doubleClick" => "双击",
         "hold" => "长按",
-        "holdScroll" => "点击并滚动",
-        "holdDrag" => "点击并拖动",
+        "holdScroll" => "按住并滚动",
+        "wheelUp" => "向上滚动（旧设置）",
+        "wheelDown" => "向下滚动（旧设置）",
+        "holdDrag" => "按住并拖动",
         _ => trigger
     };
 
@@ -957,6 +1066,55 @@ public partial class MainWindow : Window
         StatusBar.Visibility = Visibility.Collapsed;
     }
 
+    private async Task ResolveAboutSourceAsync()
+    {
+        if (aboutSourceResolved)
+        {
+            return;
+        }
+
+        aboutSourceResolved = true;
+        ProjectHomepageText.Text = "正在检测 GitHub / Gitee";
+        AboutSourceStatusText.Text = "正在根据当前网络选择项目来源…";
+        OpenProjectHomepageButton.IsEnabled = false;
+        OpenLicenseButton.IsEnabled = false;
+
+        try
+        {
+            var result = await updateService.ResolvePreferredSourceAsync();
+            if (result.Source.HasValue)
+            {
+                ApplyAboutSource(result.Source.Value);
+                return;
+            }
+
+            ApplyUnavailableAboutSource(result.ErrorMessage ?? "GitHub 和 Gitee 暂不可用，请检查网络后重试。");
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or InvalidOperationException)
+        {
+            ApplyUnavailableAboutSource("GitHub 和 Gitee 暂不可用，请检查网络后重试。");
+        }
+    }
+
+    private void ApplyAboutSource(UpdateSource source)
+    {
+        aboutSource = source;
+        var sourceName = source == UpdateSource.Gitee ? "Gitee" : "GitHub";
+        ProjectHomepageText.Text = UpdateService.GetProjectHomepageUrl(source).Replace("https://", string.Empty);
+        AboutSourceStatusText.Text = $"当前使用 {sourceName}；项目主页、许可和更新页面将保持一致。";
+        OpenProjectHomepageButton.IsEnabled = true;
+        OpenLicenseButton.IsEnabled = true;
+    }
+
+    private void ApplyUnavailableAboutSource(string message)
+    {
+        aboutSource = null;
+        ProjectHomepageText.Text = "GitHub / Gitee 均不可用";
+        AboutSourceStatusText.Text = message;
+        OpenProjectHomepageButton.IsEnabled = false;
+        OpenLicenseButton.IsEnabled = false;
+    }
+
     private async void CheckForUpdates_Click(object sender, RoutedEventArgs e)
     {
         CheckForUpdatesButton.IsEnabled = false;
@@ -964,67 +1122,55 @@ public partial class MainWindow : Window
 
         try
         {
-            var currentVersion = new Version(
-                typeof(MainWindow).Assembly.GetName().Version?.ToString(3) ?? "0.1.1");
-            using var request = new HttpRequestMessage(HttpMethod.Get, LatestReleaseApiUrl);
-            request.Headers.UserAgent.ParseAdd($"WinMouseFix/{currentVersion}");
-            using var response = await UpdateHttpClient.SendAsync(request);
-            if (response.StatusCode == HttpStatusCode.NotFound)
+            var currentVersion = GetCurrentReleaseVersion();
+            var result = await updateService.CheckAsync(currentVersion, config.ReceiveBetaUpdates);
+            if (result.Status == UpdateCheckStatus.Error)
             {
-                ShowStatus("暂未发布可检查的版本");
+                ApplyUnavailableAboutSource(result.ErrorMessage ?? "GitHub 和 Gitee 暂不可用，请检查网络后重试。");
+                ShowStatus(result.ErrorMessage ?? "暂时无法检查更新");
                 return;
             }
 
-            response.EnsureSuccessStatusCode();
-            using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-            var tag = document.RootElement.TryGetProperty("tag_name", out var tagElement) &&
-                      tagElement.ValueKind == JsonValueKind.String
-                ? tagElement.GetString()
-                : null;
-            if (!TryParseReleaseVersion(tag, out var latestVersion))
+            if (result.Source.HasValue)
             {
-                ShowStatus("最新版本信息无法识别，请打开项目主页查看");
+                aboutSourceResolved = true;
+                ApplyAboutSource(result.Source.Value);
+            }
+
+            if (result.Status == UpdateCheckStatus.NoRelease)
+            {
+                ShowStatus(config.ReceiveBetaUpdates
+                    ? "暂未发布可检查的正式版或 Beta 版"
+                    : "暂未发布可检查的正式版本");
                 return;
             }
 
-            if (latestVersion <= currentVersion)
+            var sourceName = result.Source == UpdateSource.Gitee ? "Gitee" : "GitHub";
+            if (result.Status == UpdateCheckStatus.UpToDate)
             {
-                ShowStatus($"当前已是最新版本 {currentVersion}");
+                ShowStatus($"当前已是最新版本 {currentVersion}（{sourceName}）");
                 return;
             }
 
-            var releaseAddress = document.RootElement.TryGetProperty("html_url", out var urlElement) &&
-                                 urlElement.ValueKind == JsonValueKind.String
-                ? urlElement.GetString()
-                : null;
-            if (!Uri.TryCreate(releaseAddress, UriKind.Absolute, out var releaseUri) ||
-                releaseUri.Scheme != Uri.UriSchemeHttps ||
-                !string.Equals(releaseUri.Host, "github.com", StringComparison.OrdinalIgnoreCase))
+            var pageUrl = result.PageUrl;
+            if (result.ReleaseVersion is null || string.IsNullOrWhiteSpace(pageUrl))
             {
-                ShowStatus("新版本下载地址无效，请打开项目主页查看");
+                ShowStatus("新版本信息不完整，请稍后重试");
                 return;
             }
 
             if (System.Windows.MessageBox.Show(this,
-                    $"发现新版本 {latestVersion}，是否打开下载页面？",
+                    $"发现新版本 {result.DisplayName ?? result.ReleaseVersion.ToString()}（{sourceName}），是否打开下载页面？",
                     "Win Mouse Fix 更新",
                     MessageBoxButton.YesNo,
                     MessageBoxImage.Information) == MessageBoxResult.Yes)
             {
-                OpenWebPage(releaseUri.AbsoluteUri, "无法打开最新版本页面");
+                OpenWebPage(pageUrl!, "无法打开最新版本页面");
             }
         }
-        catch (TaskCanceledException)
+        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
         {
-            ShowStatus("检查更新超时，请稍后重试");
-        }
-        catch (HttpRequestException)
-        {
-            ShowStatus("无法连接 GitHub，请确认网络连接后重试");
-        }
-        catch (JsonException)
-        {
-            ShowStatus("GitHub 返回的版本信息无法读取，请稍后重试");
+            ShowStatus("无法检查更新，请稍后重试");
         }
         finally
         {
@@ -1034,23 +1180,35 @@ public partial class MainWindow : Window
     }
 
     internal static bool TryParseReleaseVersion(string? tag, out Version version)
+        => UpdateService.TryParseVersion(tag, out version);
+
+    private static ReleaseVersion GetCurrentReleaseVersion()
     {
-        var value = tag?.Trim().TrimStart('v', 'V').Split('-', '+')[0];
-        if (Version.TryParse(value, out var parsed) && parsed.Build >= 0)
+        var assembly = typeof(MainWindow).Assembly;
+        var informationVersion = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+        if (ReleaseVersion.TryParse(informationVersion, out var releaseVersion))
         {
-            version = new Version(parsed.Major, parsed.Minor, parsed.Build);
-            return true;
+            return releaseVersion;
         }
 
-        version = new Version();
-        return false;
+        return ReleaseVersion.FromVersion(assembly.GetName().Version ?? new Version(0, 1, 2));
     }
 
-    private void OpenProjectHomepage_Click(object sender, RoutedEventArgs e) =>
-        OpenWebPage(ProjectHomepageUrl, "无法打开项目主页");
+    private void OpenProjectHomepage_Click(object sender, RoutedEventArgs e)
+    {
+        if (aboutSource.HasValue)
+        {
+            OpenWebPage(UpdateService.GetProjectHomepageUrl(aboutSource.Value), "无法打开项目主页");
+        }
+    }
 
-    private void OpenLicense_Click(object sender, RoutedEventArgs e) =>
-        OpenWebPage(LicenseUrl, "无法打开许可页面");
+    private void OpenLicense_Click(object sender, RoutedEventArgs e)
+    {
+        if (aboutSource.HasValue)
+        {
+            OpenWebPage(UpdateService.GetLicenseUrl(aboutSource.Value), "无法打开许可页面");
+        }
+    }
 
     private void OpenWebPage(string address, string errorMessage)
     {
@@ -1104,6 +1262,8 @@ public partial class MainWindow : Window
         Topmost = false;
         Focus();
     }
+
+    internal void RequestApplicationShutdown() => _ = ExitApplicationAsync();
 
     private async Task ExitApplicationAsync()
     {

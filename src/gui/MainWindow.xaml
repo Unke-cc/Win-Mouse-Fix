@@ -50,8 +50,8 @@
                 <DataTrigger Binding="{Binding Trigger}" Value="click"><Setter Property="Text" Value="点击" /></DataTrigger>
                 <DataTrigger Binding="{Binding Trigger}" Value="doubleClick"><Setter Property="Text" Value="双击" /></DataTrigger>
                 <DataTrigger Binding="{Binding Trigger}" Value="hold"><Setter Property="Text" Value="长按" /></DataTrigger>
-                <DataTrigger Binding="{Binding Trigger}" Value="holdScroll"><Setter Property="Text" Value="点击并滚动" /></DataTrigger>
-                <DataTrigger Binding="{Binding Trigger}" Value="holdDrag"><Setter Property="Text" Value="点击并拖动" /></DataTrigger>
+                <DataTrigger Binding="{Binding Trigger}" Value="holdScroll"><Setter Property="Text" Value="按住并滚动" /></DataTrigger>
+                <DataTrigger Binding="{Binding Trigger}" Value="holdDrag"><Setter Property="Text" Value="按住并拖动" /></DataTrigger>
                 <DataTrigger Binding="{Binding Trigger}" Value="dragUp"><Setter Property="Text" Value="向上拖动（旧设置）" /></DataTrigger>
                 <DataTrigger Binding="{Binding Trigger}" Value="dragDown"><Setter Property="Text" Value="向下拖动（旧设置）" /></DataTrigger>
                 <DataTrigger Binding="{Binding Trigger}" Value="dragLeft"><Setter Property="Text" Value="向左拖动（旧设置）" /></DataTrigger>
@@ -109,7 +109,8 @@
         </Border>
 
         <Grid x:Name="ContentHost" Grid.Row="1">
-            <ScrollViewer x:Name="GeneralPage" VerticalScrollBarVisibility="Auto"
+            <ScrollViewer x:Name="GeneralPage" VerticalScrollBarVisibility="Disabled"
+                          HorizontalScrollBarVisibility="Disabled"
                           HorizontalContentAlignment="Center">
                 <StackPanel Width="620" Margin="0,24,0,28">
                     <TextBlock Text="控制运行方式，以及在哪些应用中保留鼠标原始行为。" Style="{StaticResource PageDescription}" />
@@ -168,25 +169,32 @@
                             </Grid>
                             <TextBlock x:Name="EmptyApplicationsText" Text="还没有添加应用。"
                                        Foreground="{StaticResource MutedTextBrush}" Margin="0,16,0,0" />
-                            <ItemsControl ItemsSource="{Binding ExcludedApps}">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <Grid Margin="0,10,0,0">
-                                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                            <Border Background="#F7F9FC" CornerRadius="9" Padding="12">
-                                                <StackPanel>
-                                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
-                                                    <TextBlock Text="{Binding Path}" Foreground="{StaticResource MutedTextBrush}"
-                                                               FontSize="11" TextTrimming="CharacterEllipsis" />
-                                                </StackPanel>
-                                            </Border>
-                                            <Button Grid.Column="1" Content="移除" Margin="8,0,0,0"
-                                                    CommandParameter="{Binding}" Click="RemoveApplication_Click" />
-                                        </Grid>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
+                            <ScrollViewer MaxHeight="180" VerticalScrollBarVisibility="Auto"
+                                          HorizontalScrollBarVisibility="Disabled">
+                                <ItemsControl ItemsSource="{Binding ExcludedApps}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Margin="0,10,0,0">
+                                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                                <Border Background="#F7F9FC" CornerRadius="9" Padding="12">
+                                                    <StackPanel>
+                                                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                                                        <TextBlock Text="{Binding Path}" Foreground="{StaticResource MutedTextBrush}"
+                                                                   FontSize="11" TextTrimming="CharacterEllipsis" />
+                                                    </StackPanel>
+                                                </Border>
+                                                <Button Grid.Column="1" Content="移除" Margin="8,0,0,0"
+                                                        CommandParameter="{Binding}" Click="RemoveApplication_Click" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
                         </StackPanel>
+                    </Border>
+
+                    <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0" Padding="0,12,0,0">
+                        <Button Content="配置管理…" HorizontalAlignment="Left" Click="OpenProfileManager_Click" />
                     </Border>
 
                 </StackPanel>
@@ -318,6 +326,7 @@
                                                     CommandParameter="{Binding}" Click="RemoveRemap_Click" />
                                             <TextBlock Grid.Column="1" Style="{StaticResource TriggerLabel}" />
                                             <ComboBox Grid.Column="2" Margin="0,0,8,0"
+                                                      ToolTip="选择这个操作要执行的动作。"
                                                       ItemsSource="{Binding Trigger, Converter={StaticResource TriggerActionOptionsConverter}}"
                                                       SelectedValuePath="Type"
                                                       PreviewMouseWheel="RemapComboBox_PreviewMouseWheel"
@@ -341,15 +350,16 @@
                 <Border Grid.Row="3" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0" Padding="0,12,0,0">
                     <Grid>
                         <Button Content="选项…" HorizontalAlignment="Left" Click="OpenButtonOptions_Click" />
-                        <Button Content="恢复推荐设置…" HorizontalAlignment="Right" Click="RestoreRecommended_Click" />
+                        <Button Content="恢复默认值..." HorizontalAlignment="Right" Click="RestoreDefaults_Click" />
                     </Grid>
                 </Border>
             </Grid>
 
-            <ScrollViewer x:Name="ScrollPage" Visibility="Collapsed" VerticalScrollBarVisibility="Auto"
+            <ScrollViewer x:Name="ScrollPage" Visibility="Collapsed" VerticalScrollBarVisibility="Disabled"
+                          HorizontalScrollBarVisibility="Disabled"
                           HorizontalContentAlignment="Center">
                 <StackPanel Width="620" Margin="0,24,0,28">
-                    <TextBlock Text="调整普通滚轮的方向、速度与平滑度。" Style="{StaticResource PageDescription}" />
+                    <TextBlock Text="调整普通滚轮，以及键盘修饰键配合滚轮执行的动作。" Style="{StaticResource PageDescription}" />
 
                     <Border Style="{StaticResource Card}">
                         <Grid>
@@ -397,10 +407,85 @@
                                       IsChecked="{Binding Scroll.Smooth, Mode=TwoWay}" />
                         </Grid>
                     </Border>
+
+                    <Border Style="{StaticResource Card}">
+                        <StackPanel>
+                            <TextBlock Text="键盘修饰键" Style="{StaticResource SectionTitle}" />
+                            <TextBlock Text="按住指定按键并滚动滚轮，即可执行对应动作；同一个按键不能重复分配。"
+                                       Foreground="{StaticResource MutedTextBrush}" Margin="0,4,0,14" />
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+
+                                <Grid Margin="0,0,10,12">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="96" /></Grid.ColumnDefinitions>
+                                    <StackPanel Margin="0,0,8,0">
+                                        <TextBlock Text="水平滚动" FontWeight="SemiBold" />
+                                        <TextBlock Text="上滚向左，下滚向右。" Foreground="{StaticResource MutedTextBrush}" FontSize="11" />
+                                    </StackPanel>
+                                    <ComboBox Grid.Column="1" SelectedValuePath="Tag" PreviewMouseWheel="ModifierComboBox_PreviewMouseWheel"
+                                              SelectedValue="{Binding Scroll.HorizontalModifier, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
+                                        <ComboBoxItem Tag="none" Content="关闭" /><ComboBoxItem Tag="ctrl" Content="Ctrl" />
+                                        <ComboBoxItem Tag="alt" Content="Alt" /><ComboBoxItem Tag="shift" Content="Shift" />
+                                        <ComboBoxItem Tag="win" Content="Win" />
+                                    </ComboBox>
+                                </Grid>
+
+                                <Grid Grid.Column="1" Margin="10,0,0,12">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="96" /></Grid.ColumnDefinitions>
+                                    <StackPanel Margin="0,0,8,0">
+                                        <TextBlock Text="快速滚动" FontWeight="SemiBold" />
+                                        <TextBlock Text="当前速度的 4 倍。" Foreground="{StaticResource MutedTextBrush}" FontSize="11" />
+                                    </StackPanel>
+                                    <ComboBox Grid.Column="1" SelectedValuePath="Tag" PreviewMouseWheel="ModifierComboBox_PreviewMouseWheel"
+                                              SelectedValue="{Binding Scroll.FastModifier, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
+                                        <ComboBoxItem Tag="none" Content="关闭" /><ComboBoxItem Tag="ctrl" Content="Ctrl" />
+                                        <ComboBoxItem Tag="alt" Content="Alt" /><ComboBoxItem Tag="shift" Content="Shift" />
+                                        <ComboBoxItem Tag="win" Content="Win" />
+                                    </ComboBox>
+                                </Grid>
+
+                                <Grid Grid.Row="1" Margin="0,0,10,0">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="96" /></Grid.ColumnDefinitions>
+                                    <StackPanel Margin="0,0,8,0">
+                                        <TextBlock Text="精确滚动" FontWeight="SemiBold" />
+                                        <TextBlock Text="当前速度的四分之一。" Foreground="{StaticResource MutedTextBrush}" FontSize="11" />
+                                    </StackPanel>
+                                    <ComboBox Grid.Column="1" SelectedValuePath="Tag" PreviewMouseWheel="ModifierComboBox_PreviewMouseWheel"
+                                              SelectedValue="{Binding Scroll.PrecisionModifier, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
+                                        <ComboBoxItem Tag="none" Content="关闭" /><ComboBoxItem Tag="ctrl" Content="Ctrl" />
+                                        <ComboBoxItem Tag="alt" Content="Alt" /><ComboBoxItem Tag="shift" Content="Shift" />
+                                        <ComboBoxItem Tag="win" Content="Win" />
+                                    </ComboBox>
+                                </Grid>
+
+                                <Grid Grid.Row="1" Grid.Column="1" Margin="10,0,0,0">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="96" /></Grid.ColumnDefinitions>
+                                    <StackPanel Margin="0,0,8,0">
+                                        <TextBlock Text="放大或缩小" FontWeight="SemiBold" />
+                                        <TextBlock Text="在支持的应用中缩放。" Foreground="{StaticResource MutedTextBrush}" FontSize="11" />
+                                    </StackPanel>
+                                    <ComboBox Grid.Column="1" SelectedValuePath="Tag" PreviewMouseWheel="ModifierComboBox_PreviewMouseWheel"
+                                              SelectedValue="{Binding Scroll.ZoomModifier, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
+                                        <ComboBoxItem Tag="none" Content="关闭" /><ComboBoxItem Tag="ctrl" Content="Ctrl" />
+                                        <ComboBoxItem Tag="alt" Content="Alt" /><ComboBoxItem Tag="shift" Content="Shift" />
+                                        <ComboBoxItem Tag="win" Content="Win" />
+                                    </ComboBox>
+                                </Grid>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
                 </StackPanel>
             </ScrollViewer>
 
-            <ScrollViewer x:Name="AboutPage" Visibility="Collapsed" VerticalScrollBarVisibility="Auto"
+            <ScrollViewer x:Name="AboutPage" Visibility="Collapsed" VerticalScrollBarVisibility="Disabled"
+                          HorizontalScrollBarVisibility="Disabled"
                           HorizontalContentAlignment="Center">
                 <StackPanel Width="620" Margin="0,24,0,28">
                     <TextBlock Text="Win Mouse Fix 使用 AutoHotkey v2 提供鼠标按钮与滚动功能。"
@@ -434,16 +519,33 @@
                                 <TextBlock Grid.Row="1" Text="许可状态" Foreground="{StaticResource MutedTextBrush}" Margin="0,0,0,10" />
                                 <TextBlock Grid.Row="1" Grid.Column="1" Text="个人非商业使用免费；其他用途需另行许可" Margin="0,0,0,10" />
                                 <TextBlock Grid.Row="2" Text="项目主页" Foreground="{StaticResource MutedTextBrush}" />
-                                <TextBlock Grid.Row="2" Grid.Column="1" Text="github.com/Unke-cc/Win-Mouse-Fix" />
+                                <TextBlock x:Name="ProjectHomepageText" Grid.Row="2" Grid.Column="1" Text="正在检测 GitHub / Gitee" />
                             </Grid>
 
                             <StackPanel Orientation="Horizontal" Margin="0,20,0,0">
                                 <Button x:Name="CheckForUpdatesButton" Content="检查更新" Style="{StaticResource PrimaryButton}"
                                         Click="CheckForUpdates_Click" Margin="0,0,10,0" />
-                                <Button Content="打开项目主页" Click="OpenProjectHomepage_Click" Margin="0,0,10,0" />
-                                <Button Content="查看许可" Click="OpenLicense_Click" />
+                                <Button x:Name="OpenProjectHomepageButton" Content="打开项目主页" Click="OpenProjectHomepage_Click" Margin="0,0,10,0" />
+                                <Button x:Name="OpenLicenseButton" Content="查看许可" Click="OpenLicense_Click" />
                             </StackPanel>
+                            <TextBlock x:Name="AboutSourceStatusText" Margin="0,12,0,0"
+                                       Foreground="{StaticResource MutedTextBrush}"
+                                       Text="将根据网络自动选择 GitHub 或 Gitee" />
                         </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource Card}">
+                        <Grid>
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="获取 Beta 版更新" Style="{StaticResource SectionTitle}" />
+                                <TextBlock Text="开启后同时检查测试版本；默认只检查正式版本。"
+                                           Foreground="{StaticResource MutedTextBrush}" />
+                            </StackPanel>
+                            <CheckBox Grid.Column="1" Style="{StaticResource ToggleSwitch}"
+                                      AutomationProperties.Name="获取 Beta 版更新"
+                                      IsChecked="{Binding ReceiveBetaUpdates, Mode=TwoWay}" />
+                        </Grid>
                     </Border>
 
                     <Border Style="{StaticResource Card}">

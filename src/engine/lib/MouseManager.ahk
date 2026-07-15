@@ -9,6 +9,7 @@ class MouseManager {
         this.started := false
         this.sequence := 0
         this.scrollCarry := 0.0
+        this.scrollMode := "regular"
         this.smoothQueue := []
         this.smoothTimer := ObjBindMethod(this, "ProcessSmoothWheel")
         this.motionTimer := ObjBindMethod(this, "CheckMotionAndContext")
@@ -24,13 +25,13 @@ class MouseManager {
         this.CancelAll(true)
         this.config := config
         this.scrollConfig := config["scroll"]
-        this.desktopSwipeDirection := config["desktopSwipeDirection"]
         this.multiClickMs := config["timing"]["multiClickMs"]
         this.holdMs := config["timing"]["holdMs"]
         this.dragThresholdPx := config["timing"]["dragThresholdPx"]
         this.remaps := this.BuildRemapIndex(config["remaps"])
         this.RebuildStates()
         this.scrollCarry := 0.0
+        this.scrollMode := "regular"
         this.smoothQueue := []
         SetTimer(this.smoothTimer, 0)
         if wasStarted {
@@ -68,6 +69,8 @@ class MouseManager {
                 "mode", "idle",
                 "consumed", false,
                 "gestureUsed", false,
+                "interaction", "none",
+                "wheelDirections", Map(),
                 "pendingClicks", 0,
                 "startX", 0,
                 "startY", 0,
@@ -149,6 +152,8 @@ class MouseManager {
         state["mode"] := "mapped"
         state["consumed"] := false
         state["gestureUsed"] := false
+        state["interaction"] := "none"
+        state["wheelDirections"] := Map()
         MouseGetPos(&mouseX, &mouseY)
         state["startX"] := mouseX
         state["startY"] := mouseY
@@ -197,7 +202,7 @@ class MouseManager {
 
     OnHoldTimer(buttonName, *) {
         state := this.states[buttonName]
-        if !state["isDown"] || state["mode"] != "mapped" || state["consumed"] || state["gestureUsed"] {
+        if !state["isDown"] || state["mode"] != "mapped" || state["consumed"] || state["interaction"] != "none" {
             return
         }
         if !this.appRuleManager.ShouldHandle() {
@@ -210,6 +215,8 @@ class MouseManager {
             "trigger", "hold"
         )) {
             state["consumed"] := true
+            state["interaction"] := "hold"
+            state["gestureUsed"] := true
             this.CancelPending(state)
         }
     }
@@ -238,7 +245,23 @@ class MouseManager {
             : action
     }
 
+    static ShouldResetStaleButton(state, physicalDown) {
+        return state["isDown"] && !physicalDown
+    }
+
     CheckMotionAndContext(*) {
+        for buttonName, state in this.states {
+            if !MouseManager.ShouldResetStaleButton(state, GetKeyState(buttonName, "P")) {
+                continue
+            }
+            SetTimer(state["clickTimer"], 0)
+            SetTimer(state["holdTimer"], 0)
+            if state["mode"] = "native" {
+                this.actionManager.SendButtonUp(buttonName)
+            }
+            this.ResetPhysicalState(state)
+        }
+
         canHandle := this.appRuleManager.ShouldHandle()
         if !canHandle && this.lastCanHandle {
             this.CancelAll(true)
@@ -250,7 +273,8 @@ class MouseManager {
 
         MouseGetPos(&mouseX, &mouseY)
         for buttonName, state in this.states {
-            if !state["isDown"] || state["mode"] != "mapped" || state["consumed"] {
+            if !state["isDown"] || state["mode"] != "mapped" || state["consumed"]
+                || state["interaction"] = "hold" || state["interaction"] = "wheel" {
                 continue
             }
             deltaX := mouseX - state["lastX"]
@@ -276,11 +300,11 @@ class MouseManager {
                 "button", buttonName,
                 "trigger", "holdDrag",
                 "dragDirection", direction,
-                "desktopSwipeDirection", this.desktopSwipeDirection,
                 "deltaX", deltaX,
                 "deltaY", deltaY
             )) {
                 state["gestureUsed"] := true
+                state["interaction"] := "drag"
                 SetTimer(state["holdTimer"], 0)
                 this.CancelPending(state)
                 state["lastX"] := mouseX
@@ -301,34 +325,101 @@ class MouseManager {
                 this.actionManager.SendWheel(direction)
                 return
             }
-            action := this.GetWheelAction(activeButton, direction)
-            if action["type"] != "None" && this.actionManager.Execute(action, Map(
-                "button", activeButton,
-                "wheelDirection", direction,
-                "trigger", "holdScroll"
-            )) {
-                state["gestureUsed"] := true
-                SetTimer(state["holdTimer"], 0)
-                this.CancelPending(state)
+            if state["interaction"] = "hold" || state["interaction"] = "drag" {
+                this.SendRegularWheel(direction)
                 return
             }
+            action := this.GetWheelAction(activeButton, direction)
+            if action["type"] = "None" {
+                if state["interaction"] = "wheel" {
+                    return
+                }
+            } else {
+                repeatMode := this.GetWheelRepeatMode(action)
+                if repeatMode = "once" && state["wheelDirections"].Has("once") {
+                    return
+                }
+                if repeatMode = "perDirection" && state["wheelDirections"].Has(direction) {
+                    return
+                }
+                if this.actionManager.Execute(action, Map(
+                    "button", activeButton,
+                    "wheelDirection", direction,
+                    "trigger", direction = "up" ? "wheelUp" : "wheelDown"
+                )) {
+                    state["interaction"] := "wheel"
+                    state["consumed"] := true
+                    state["gestureUsed"] := true
+                    state["wheelDirections"][repeatMode = "once" ? "once" : direction] := true
+                    SetTimer(state["holdTimer"], 0)
+                    this.CancelPending(state)
+                    return
+                }
+            }
+        }
+        if this.appRuleManager.ShouldHandle() && this.TryModifierWheel(direction) {
+            return
         }
         this.SendRegularWheel(direction)
     }
 
-    SendRegularWheel(direction) {
+    TryModifierWheel(direction) {
+        if this.IsModifierPressed(this.scrollConfig["horizontalModifier"]) {
+            this.BeginScrollMode("horizontal")
+            direction := this.ApplyScrollDirection(direction)
+            this.actionManager.SendHorizontalWheel(direction = "down" ? "right" : "left")
+            return true
+        }
+        if this.IsModifierPressed(this.scrollConfig["fastModifier"]) {
+            this.SendRegularWheel(direction, 4.0, "fast")
+            return true
+        }
+        if this.IsModifierPressed(this.scrollConfig["precisionModifier"]) {
+            this.SendRegularWheel(direction, 0.25, "precision")
+            return true
+        }
+        if this.IsModifierPressed(this.scrollConfig["zoomModifier"]) {
+            this.BeginScrollMode("zoom")
+            direction := this.ApplyScrollDirection(direction)
+            return this.actionManager.Execute(Map("type", "Zoom", "shortcut", ""), Map(
+                "wheelDirection", direction,
+                "trigger", "modifierWheel"
+            ))
+        }
+        return false
+    }
+
+    IsModifierPressed(modifier) {
+        switch modifier {
+            case "ctrl":
+                return GetKeyState("LControl", "P") || GetKeyState("RControl", "P")
+            case "alt":
+                return GetKeyState("LAlt", "P") || GetKeyState("RAlt", "P")
+            case "shift":
+                return GetKeyState("LShift", "P") || GetKeyState("RShift", "P")
+            case "win":
+                return GetKeyState("LWin", "P") || GetKeyState("RWin", "P")
+            default:
+                return false
+        }
+    }
+
+    ApplyScrollDirection(direction) {
+        return this.scrollConfig["reverse"] ? (direction = "up" ? "down" : "up") : direction
+    }
+
+    SendRegularWheel(direction, speedScale := 1.0, scrollMode := "regular") {
         if !this.appRuleManager.ShouldHandle() {
             this.actionManager.SendWheel(direction)
             return
         }
-        if this.scrollConfig["reverse"] {
-            direction := direction = "up" ? "down" : "up"
-        }
+        this.BeginScrollMode(scrollMode)
+        direction := this.ApplyScrollDirection(direction)
         if this.scrollConfig["smooth"] {
-            this.QueueSmoothWheel(direction)
+            this.QueueSmoothWheel(direction, speedScale)
             return
         }
-        this.scrollCarry += this.scrollConfig["speed"]
+        this.scrollCarry += this.scrollConfig["speed"] * speedScale
         sendCount := Floor(this.scrollCarry)
         if sendCount < 1 {
             return
@@ -337,8 +428,18 @@ class MouseManager {
         this.actionManager.SendWheel(direction, sendCount)
     }
 
-    QueueSmoothWheel(direction) {
-        this.scrollCarry += this.scrollConfig["speed"]
+    BeginScrollMode(scrollMode) {
+        if this.scrollMode = scrollMode {
+            return
+        }
+        this.scrollMode := scrollMode
+        this.scrollCarry := 0.0
+        this.smoothQueue := []
+        SetTimer(this.smoothTimer, 0)
+    }
+
+    QueueSmoothWheel(direction, speedScale := 1.0) {
+        this.scrollCarry += this.scrollConfig["speed"] * speedScale
         sendCount := Floor(this.scrollCarry)
         if sendCount < 1 {
             return
@@ -393,6 +494,18 @@ class MouseManager {
             : this.GetAction(buttonName, direction = "up" ? "wheelUp" : "wheelDown")
     }
 
+    GetWheelRepeatMode(action) {
+        switch action["type"] {
+            case "Original", "FastScroll", "Zoom", "VolumeUp", "VolumeDown",
+                "VolumeControl", "TabNavigation", "BrowserNavigation", "DesktopSwitch":
+                return "perStep"
+            case "DesktopStartMenu":
+                return "perDirection"
+            default:
+                return "once"
+        }
+    }
+
     GetDragAction(buttonName, direction) {
         action := this.GetAction(buttonName, "holdDrag")
         return action["type"] != "None" ? action
@@ -413,6 +526,8 @@ class MouseManager {
             state["pendingClicks"] := 0
             state["consumed"] := false
             state["gestureUsed"] := false
+            state["interaction"] := "none"
+            state["wheelDirections"] := Map()
             if state["isDown"] && state["mode"] = "mapped" && suppressHeld {
                 state["mode"] := "suppressed"
             } else if !state["isDown"] {
@@ -433,6 +548,8 @@ class MouseManager {
         state["pendingClicks"] := 0
         state["consumed"] := false
         state["gestureUsed"] := false
+        state["interaction"] := "none"
+        state["wheelDirections"] := Map()
         state["mode"] := "suppressed"
         this.actionManager.ReleaseAll()
     }
@@ -442,6 +559,8 @@ class MouseManager {
         state["mode"] := "idle"
         state["consumed"] := false
         state["gestureUsed"] := false
+        state["interaction"] := "none"
+        state["wheelDirections"] := Map()
         state["pendingClicks"] := 0
     }
 }

@@ -6,11 +6,8 @@ namespace WinMouseFix.Gui;
 
 public partial class ButtonOptionsWindow : Window
 {
-    private readonly AppConfig config;
-
     public ButtonOptionsWindow(AppConfig config)
     {
-        this.config = config;
         DoubleClickSpeedOptions =
         [
             new("fast", "快 · 150 ms"),
@@ -20,19 +17,9 @@ public partial class ButtonOptionsWindow : Window
 
         InitializeComponent();
         DataContext = config;
-        FollowMouseOption.IsChecked = config.DesktopSwipeDirection == "followMouse";
-        OppositeMouseOption.IsChecked = config.DesktopSwipeDirection == "oppositeMouse";
     }
 
     public IReadOnlyList<DoubleClickSpeedOption> DoubleClickSpeedOptions { get; }
-
-    private void SwipeDirection_Checked(object sender, RoutedEventArgs e)
-    {
-        if (sender is System.Windows.Controls.RadioButton { Tag: string direction })
-        {
-            config.DesktopSwipeDirection = direction;
-        }
-    }
 
     private void ComboBox_PreviewMouseWheel(object sender, System.Windows.Input.MouseWheelEventArgs e)
     {

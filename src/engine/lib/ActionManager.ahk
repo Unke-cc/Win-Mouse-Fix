@@ -25,9 +25,9 @@ class ActionManager {
             case "StartMenu":
                 SendEvent("{LWin}")
             case "DesktopLeft":
-                SendEvent("^#{Left}")
+                this.SendDesktopSwitch("left")
             case "DesktopRight":
-                SendEvent("^#{Right}")
+                this.SendDesktopSwitch("right")
             case "AltTab":
                 SendEvent("!{Tab}")
             case "CloseWindow":
@@ -56,10 +56,22 @@ class ActionManager {
                     return false
                 }
                 SendEvent(context["wheelDirection"] = "down" ? "^{WheelDown}" : "^{WheelUp}")
+            case "VolumeControl":
+                return this.ExecuteWheelPair("VolumeUp", "VolumeDown", context)
+            case "TabNavigation":
+                return this.ExecuteWheelPair("PreviousTab", "NextTab", context)
+            case "BrowserNavigation":
+                return this.ExecuteWheelPair("Back", "Forward", context)
+            case "DesktopSwitch":
+                return this.ExecuteWheelPair("DesktopLeft", "DesktopRight", context)
+            case "DesktopStartMenu":
+                return this.ExecuteWheelPair("ShowDesktop", "StartMenu", context)
             case "ScrollMove":
                 return this.ScrollFromDrag(context)
             case "DesktopNavigation":
                 return this.NavigateFromDrag(context)
+            case "BrowserTabNavigation":
+                return this.NavigateBrowserFromDrag(context)
             case "CustomShortcut":
                 shortcut := this.ToAutoHotkeyShortcut(action["shortcut"])
                 if shortcut = "" {
@@ -70,6 +82,14 @@ class ActionManager {
                 return false
         }
         return true
+    }
+
+    ExecuteWheelPair(upActionType, downActionType, context) {
+        if !(context is Map) || !context.Has("wheelDirection") {
+            return false
+        }
+        actionType := context["wheelDirection"] = "down" ? downActionType : upActionType
+        return this.Execute(Map("type", actionType, "shortcut", ""), context)
     }
 
     ScrollFromDrag(context) {
@@ -93,9 +113,12 @@ class ActionManager {
         if !(context is Map) || !context.Has("dragDirection") {
             return false
         }
-        swipeDirection := context.Has("desktopSwipeDirection")
-            ? context["desktopSwipeDirection"] : "followMouse"
-        shortcut := this.DesktopNavigationShortcut(context["dragDirection"], swipeDirection)
+        dragDirection := context["dragDirection"]
+        if dragDirection = "left" || dragDirection = "right" {
+            this.SendDesktopSwitch(dragDirection = "left" ? "right" : "left")
+            return true
+        }
+        shortcut := this.DesktopNavigationShortcut(dragDirection)
         if shortcut = "" {
             return false
         }
@@ -103,7 +126,26 @@ class ActionManager {
         return true
     }
 
-    DesktopNavigationShortcut(dragDirection, swipeDirection) {
+    NavigateBrowserFromDrag(context) {
+        if !(context is Map) || !context.Has("dragDirection") {
+            return false
+        }
+        switch context["dragDirection"] {
+            case "up":
+                actionType := "PreviousTab"
+            case "down":
+                actionType := "NextTab"
+            case "left":
+                actionType := "Back"
+            case "right":
+                actionType := "Forward"
+            default:
+                return false
+        }
+        return this.Execute(Map("type", actionType, "shortcut", ""), context)
+    }
+
+    DesktopNavigationShortcut(dragDirection, swipeDirection := "followMouse") {
         followMouse := swipeDirection != "oppositeMouse"
         switch dragDirection {
             case "left":
@@ -154,6 +196,12 @@ class ActionManager {
         wheelKey := direction = "right" ? "WheelRight" : "WheelLeft"
         SendEvent("{Blind}{" wheelKey " " Max(1, count) "}")
     }
+
+    SendDesktopSwitch(direction) {
+        SendInput(this.DesktopSwitchShortcut(direction))
+    }
+
+    DesktopSwitchShortcut(direction) => direction = "right" ? "^#{Right}" : "^#{Left}"
 
     ReleaseAll() {
         ; MVP actions use complete key presses and therefore keep no synthetic key held.
