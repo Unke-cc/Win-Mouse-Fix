@@ -42,7 +42,7 @@ public static class RuntimeLauncher
         return WaitForEvent(RuntimeNames.TrayReadyEvent);
     }
 
-    public static bool StartSettingsProcess()
+    public static bool StartSettingsProcess(bool lightweight = false)
     {
         if (Signal(RuntimeNames.SettingsActivateEvent))
         {
@@ -60,6 +60,7 @@ public static class RuntimeLauncher
             Process.Start(new ProcessStartInfo
             {
                 FileName = executable,
+                Arguments = lightweight ? "--lightweight" : string.Empty,
                 WorkingDirectory = Path.GetDirectoryName(executable)!,
                 UseShellExecute = false,
                 CreateNoWindow = true

@@ -17,12 +17,16 @@ public sealed class TrayService : IDisposable
     {
         this.iconFactory = iconFactory;
         toggleItem = new Forms.ToolStripMenuItem();
-        lightweightItem = new Forms.ToolStripMenuItem("立即进入轻量模式", null, (_, _) => Raise(LightweightModeRequested));
+        lightweightItem = new Forms.ToolStripMenuItem("轻量模式", null, (_, _) => Raise(LightweightModeRequested))
+        {
+            CheckOnClick = true
+        };
         menu = new Forms.ContextMenuStrip
         {
             AutoClose = true,
-            ShowCheckMargin = false,
-            ShowImageMargin = false
+            ShowCheckMargin = true,
+            ShowImageMargin = false,
+            Font = new Drawing.Font("Segoe UI", 9F, Drawing.FontStyle.Regular)
         };
         menu.Items.Add(new Forms.ToolStripMenuItem("打开设置", null, (_, _) => Raise(OpenSettingsRequested))
         {
@@ -50,7 +54,11 @@ public sealed class TrayService : IDisposable
     public event EventHandler? LightweightModeRequested;
     public event EventHandler? ExitRequested;
 
-    public void Update(bool running, bool settingsAvailable)
+    public bool IsLightweightModeChecked => lightweightItem.Checked;
+
+    public void SetLightweightModeChecked(bool checkedState) => lightweightItem.Checked = checkedState;
+
+    public void Update(bool running)
     {
         if (disposed)
         {
@@ -58,13 +66,15 @@ public sealed class TrayService : IDisposable
         }
 
         toggleItem.Text = running ? "停止 Win Mouse Fix" : "启动 Win Mouse Fix";
-        lightweightItem.Enabled = settingsAvailable;
-        lightweightItem.Text = settingsAvailable ? "立即进入轻量模式" : "轻量模式已启用";
+        lightweightItem.Enabled = true;
+        lightweightItem.Text = "轻量模式";
         if (lastRunning != running)
         {
+            trayIcon.Visible = false;
             var previousIcon = trayIcon.Icon;
             trayIcon.Icon = iconFactory(running);
             previousIcon?.Dispose();
+            trayIcon.Visible = true;
             lastRunning = running;
         }
         trayIcon.Text = "Win Mouse Fix";

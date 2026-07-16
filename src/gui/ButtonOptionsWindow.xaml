@@ -53,6 +53,7 @@
                                VerticalAlignment="Center" />
                 </Grid>
                 <Slider Minimum="5" Maximum="200" TickFrequency="1" IsSnapToTickEnabled="True"
+                        Style="{StaticResource SliderStyle}"
                         Value="{Binding Timing.DragThresholdPx, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                 <Grid Margin="0,6,0,0">
                     <TextBlock Text="5 px" Foreground="{StaticResource MutedTextBrush}" FontSize="11" />

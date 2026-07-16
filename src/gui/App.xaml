@@ -119,6 +119,8 @@
         </Style>
 
         <Style x:Key="ScrollSpeedSliderTrackButton" TargetType="RepeatButton">
+            <Setter Property="Height" Value="6" />
+            <Setter Property="VerticalAlignment" Value="Center" />
             <Setter Property="BorderThickness" Value="0" />
             <Setter Property="Padding" Value="0" />
             <Setter Property="Template">
@@ -130,9 +132,10 @@
             </Setter>
         </Style>
 
-        <Style x:Key="ScrollSpeedSliderThumb" TargetType="Thumb">
+        <Style x:Key="SliderThumb" TargetType="Thumb">
             <Setter Property="Width" Value="18" />
             <Setter Property="Height" Value="18" />
+            <Setter Property="Panel.ZIndex" Value="1" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Template">
                 <Setter.Value>
@@ -148,20 +151,20 @@
             </Setter>
         </Style>
 
-        <Style x:Key="ScrollSpeedSlider" TargetType="Slider">
-            <Setter Property="Height" Value="28" />
+        <Style x:Key="SliderStyle" TargetType="Slider">
+            <Setter Property="Height" Value="32" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Slider">
-                        <Grid Height="28" ClipToBounds="False">
-                            <Track x:Name="PART_Track" VerticalAlignment="Center" Height="6">
+                        <Grid Height="32" ClipToBounds="False">
+                            <Track x:Name="PART_Track" VerticalAlignment="Center" Height="18" ClipToBounds="False">
                                 <Track.DecreaseRepeatButton>
                                     <RepeatButton Command="Slider.DecreaseLarge"
                                                   Background="{StaticResource PrimaryBrush}"
                                                   Style="{StaticResource ScrollSpeedSliderTrackButton}" />
                                 </Track.DecreaseRepeatButton>
                                 <Track.Thumb>
-                                    <Thumb Style="{StaticResource ScrollSpeedSliderThumb}" />
+                                    <Thumb Style="{StaticResource SliderThumb}" />
                                 </Track.Thumb>
                                 <Track.IncreaseRepeatButton>
                                     <RepeatButton Command="Slider.IncreaseLarge"

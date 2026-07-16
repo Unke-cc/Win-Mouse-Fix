@@ -33,7 +33,7 @@ internal sealed class TrayApplicationContext : Forms.ApplicationContext
         trayService = new TrayService(LoadTrayIcon);
         trayService.OpenSettingsRequested += (_, _) => RuntimeLauncher.StartSettingsProcess();
         trayService.ToggleRequested += (_, _) => _ = ToggleEnabledAsync();
-        trayService.LightweightModeRequested += (_, _) => RuntimeLauncher.Signal(RuntimeNames.SettingsLightweightEvent);
+        trayService.LightweightModeRequested += (_, _) => ToggleLightweightMode();
         trayService.ExitRequested += (_, _) => ExitApplication();
 
         statusTimer = new Forms.Timer { Interval = 1000 };
@@ -45,7 +45,7 @@ internal sealed class TrayApplicationContext : Forms.ApplicationContext
                 return;
             }
 
-            trayService.Update(coreProcessService.IsRunning, settingsAvailable: true);
+            trayService.Update(coreProcessService.IsRunning);
         };
         statusTimer.Start();
 
@@ -61,7 +61,7 @@ internal sealed class TrayApplicationContext : Forms.ApplicationContext
         {
         }
 
-        trayService.Update(coreProcessService.IsRunning, settingsAvailable: true);
+        trayService.Update(coreProcessService.IsRunning);
         readyEvent.Set();
     }
 
@@ -100,11 +100,30 @@ internal sealed class TrayApplicationContext : Forms.ApplicationContext
 
             config.Enabled = coreProcessService.IsRunning;
             await profileService.SaveCurrentAsync(config);
-            trayService.Update(coreProcessService.IsRunning, settingsAvailable: true);
+            trayService.Update(coreProcessService.IsRunning);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
         {
             trayService.ShowBalloon("Win Mouse Fix", $"无法保存设置：{ex.Message}");
+        }
+    }
+
+    private void ToggleLightweightMode()
+    {
+        if (trayService.IsLightweightModeChecked)
+        {
+            if (!RuntimeLauncher.Signal(RuntimeNames.SettingsLightweightEvent) &&
+                !RuntimeLauncher.StartSettingsProcess(lightweight: true))
+            {
+                trayService.SetLightweightModeChecked(false);
+            }
+
+            return;
+        }
+
+        if (!RuntimeLauncher.StartSettingsProcess())
+        {
+            trayService.SetLightweightModeChecked(false);
         }
     }
 

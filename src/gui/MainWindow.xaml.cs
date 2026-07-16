@@ -109,6 +109,7 @@ public partial class MainWindow : Window
         ConfigPathText.Text = configurationService.ConfigPath;
         AboutVersionText.Text = $"版本 {GetCurrentReleaseVersion()}";
         loading = false;
+        SyncScrollModifiersFromRemaps();
         await SaveConfigurationAsync(showConfirmation: false);
         if (loadError is not null)
         {
@@ -212,6 +213,11 @@ public partial class MainWindow : Window
         {
             RejectDuplicateModifier(e.PropertyName!);
             WarnMouseModifierConflict(e.PropertyName!);
+        }
+
+        if (!loading && sender is ActionConfig action && e.PropertyName == nameof(ActionConfig.Type))
+        {
+            SyncScrollModifierFromAction(action);
         }
 
         ScheduleSave();
@@ -915,6 +921,7 @@ public partial class MainWindow : Window
         }
 
         e.Handled = true;
+        coreProcessService.Pause();
         var pressed = new HashSet<string>(StringComparer.Ordinal);
         if (Keyboard.IsKeyDown(Key.LeftCtrl) || Keyboard.IsKeyDown(Key.RightCtrl))
         {
@@ -938,6 +945,12 @@ public partial class MainWindow : Window
         shortcutBox.Focus();
     }
 
+    private void ModifierShortcutBox_MouseEnter(object sender, System.Windows.Input.MouseEventArgs e) =>
+        coreProcessService.Pause();
+
+    private void ModifierShortcutBox_MouseLeave(object sender, System.Windows.Input.MouseEventArgs e) =>
+        coreProcessService.Resume();
+
     private static readonly string[] ModifierOrder =
         { "ctrl", "alt", "shift", "win", "mbutton", "xbutton1", "xbutton2" };
 
@@ -949,6 +962,45 @@ public partial class MainWindow : Window
             case nameof(ScrollConfig.FastModifier): config.Scroll.FastModifier = value; break;
             case nameof(ScrollConfig.PrecisionModifier): config.Scroll.PrecisionModifier = value; break;
             case nameof(ScrollConfig.ZoomModifier): config.Scroll.ZoomModifier = value; break;
+        }
+    }
+
+    private void SyncScrollModifiersFromRemaps()
+    {
+        foreach (var remap in config.Remaps)
+        {
+            SyncScrollModifierFromAction(remap.Action);
+        }
+    }
+
+    private void SyncScrollModifierFromAction(ActionConfig action)
+    {
+        var remap = config.Remaps.FirstOrDefault(item => ReferenceEquals(item.Action, action));
+        if (remap is null)
+        {
+            return;
+        }
+
+        var modifier = remap.Button switch
+        {
+            "MButton" => "mbutton",
+            "XButton1" => "xbutton1",
+            "XButton2" => "xbutton2",
+            _ => null
+        };
+        if (modifier is null)
+        {
+            return;
+        }
+
+        switch (action.Type)
+        {
+            case "FastScroll":
+                config.Scroll.FastModifier = modifier;
+                break;
+            case "PrecisionScroll":
+                config.Scroll.PrecisionModifier = modifier;
+                break;
         }
     }
 

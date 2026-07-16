@@ -390,7 +390,7 @@
                                            FontWeight="SemiBold" Foreground="{StaticResource PrimaryBrush}" VerticalAlignment="Center" />
                             </Grid>
                             <Slider Minimum="0.25" Maximum="4" TickFrequency="0.25" IsSnapToTickEnabled="True"
-                                    Style="{StaticResource ScrollSpeedSlider}"
+                                    Style="{StaticResource SliderStyle}"
                                     Value="{Binding Scroll.Speed, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                     ValueChanged="ScrollSpeed_ValueChanged" />
                             <Grid Margin="0,6,0,0">
@@ -438,6 +438,8 @@
                                              Text="{Binding Scroll.HorizontalModifier, Converter={StaticResource ModifierShortcutConverter}}"
                                              PreviewKeyDown="ModifierShortcutBox_PreviewKeyDown"
                                              PreviewMouseDown="ModifierShortcutBox_PreviewMouseDown"
+                                             MouseEnter="ModifierShortcutBox_MouseEnter"
+                                             MouseLeave="ModifierShortcutBox_MouseLeave"
                                              ToolTip="按下键盘修饰键或鼠标按钮；按 Delete 清除" />
                                 </Grid>
 
@@ -451,6 +453,8 @@
                                              Text="{Binding Scroll.FastModifier, Converter={StaticResource ModifierShortcutConverter}}"
                                              PreviewKeyDown="ModifierShortcutBox_PreviewKeyDown"
                                              PreviewMouseDown="ModifierShortcutBox_PreviewMouseDown"
+                                             MouseEnter="ModifierShortcutBox_MouseEnter"
+                                             MouseLeave="ModifierShortcutBox_MouseLeave"
                                              ToolTip="按下键盘修饰键或鼠标按钮；按 Delete 清除" />
                                 </Grid>
 
@@ -464,6 +468,8 @@
                                              Text="{Binding Scroll.PrecisionModifier, Converter={StaticResource ModifierShortcutConverter}}"
                                              PreviewKeyDown="ModifierShortcutBox_PreviewKeyDown"
                                              PreviewMouseDown="ModifierShortcutBox_PreviewMouseDown"
+                                             MouseEnter="ModifierShortcutBox_MouseEnter"
+                                             MouseLeave="ModifierShortcutBox_MouseLeave"
                                              ToolTip="按下键盘修饰键或鼠标按钮；按 Delete 清除" />
                                 </Grid>
 
@@ -477,6 +483,8 @@
                                              Text="{Binding Scroll.ZoomModifier, Converter={StaticResource ModifierShortcutConverter}}"
                                              PreviewKeyDown="ModifierShortcutBox_PreviewKeyDown"
                                              PreviewMouseDown="ModifierShortcutBox_PreviewMouseDown"
+                                             MouseEnter="ModifierShortcutBox_MouseEnter"
+                                             MouseLeave="ModifierShortcutBox_MouseLeave"
                                              ToolTip="按下键盘修饰键或鼠标按钮；按 Delete 清除" />
                                 </Grid>
                             </Grid>

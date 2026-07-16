@@ -59,6 +59,7 @@ public partial class App : System.Windows.Application
         }
 
         var startInBackground = e.Args.Contains("--background", StringComparer.OrdinalIgnoreCase);
+        var startLightweight = e.Args.Contains("--lightweight", StringComparer.OrdinalIgnoreCase);
         var shutdownRequested = e.Args.Contains("--shutdown", StringComparer.OrdinalIgnoreCase);
         activationEvent = new EventWaitHandle(false, EventResetMode.AutoReset, RuntimeNames.SettingsActivateEvent);
         lightweightEvent = new EventWaitHandle(false, EventResetMode.AutoReset, RuntimeNames.SettingsLightweightEvent);
@@ -70,6 +71,10 @@ public partial class App : System.Windows.Application
             {
                 shutdownEvent.Set();
                 RuntimeLauncher.Signal(RuntimeNames.TrayShutdownEvent);
+            }
+            else if (startLightweight)
+            {
+                lightweightEvent.Set();
             }
             else if (!startInBackground)
             {
@@ -108,6 +113,11 @@ public partial class App : System.Windows.Application
             null,
             Timeout.Infinite,
             executeOnlyOnce: false);
+
+        if (startLightweight)
+        {
+            Dispatcher.BeginInvoke(new Action(() => _ = EnterLightweightModeAsync()));
+        }
         lightweightRegistration = ThreadPool.RegisterWaitForSingleObject(
             lightweightEvent,
             (_, _) =>
