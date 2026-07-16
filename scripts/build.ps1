@@ -11,6 +11,7 @@ $ErrorActionPreference = "Stop"
 
 $repositoryRoot = Get-RepositoryRoot
 $guiProject = Find-GuiProject -RepositoryRoot $repositoryRoot
+$trayProject = Get-ChildItem -LiteralPath (Join-Path $repositoryRoot "src\tray") -Filter "*.csproj" -File -ErrorAction SilentlyContinue | Select-Object -First 1
 $engineEntryPoint = Find-EngineEntryPoint -RepositoryRoot $repositoryRoot
 $defaultConfig = Join-Path $repositoryRoot "config\default.json"
 $licenseFiles = @("LICENSE.md", "COMMERCIAL-LICENSE.md", "THIRD_PARTY_NOTICES.md")
@@ -25,6 +26,12 @@ if ($null -eq $guiProject) {
     $codeErrors.Add("Expected one .NET project under src/gui.")
 } elseif ((Get-DotNetProjectTargetFramework -Project $guiProject) -ne "net48") {
     $codeErrors.Add("The GUI project must target .NET Framework 4.8 (net48).")
+}
+
+if ($null -eq $trayProject) {
+    $codeErrors.Add("Expected one .NET project under src/tray.")
+} elseif ((Get-DotNetProjectTargetFramework -Project $trayProject) -ne "net48") {
+    $codeErrors.Add("The tray project must target .NET Framework 4.8 (net48).")
 }
 
 if ($null -eq $engineEntryPoint) {
@@ -92,6 +99,28 @@ $publishExitCode = $LASTEXITCODE
 if ($publishExitCode -ne 0) {
     Write-Host "[ERROR] .NET publish failed with exit code $publishExitCode." -ForegroundColor Red
     exit 1
+}
+
+Write-Host "Publishing lightweight tray host..." -ForegroundColor Cyan
+& $dotnetPath publish $trayProject.FullName `
+    --configuration $Configuration `
+    --output $appOutput `
+    --nologo `
+    -p:DebugType=None `
+    -p:DebugSymbols=false
+$trayPublishExitCode = $LASTEXITCODE
+if ($trayPublishExitCode -ne 0) {
+    Write-Host "[ERROR] Tray host publish failed with exit code $trayPublishExitCode." -ForegroundColor Red
+    exit 1
+}
+
+$trayAssetOutput = Join-Path $appOutput "assets"
+New-Item -ItemType Directory -Path $trayAssetOutput -Force | Out-Null
+foreach ($trayIconName in @("WinMouseFix-Tray.ico", "WinMouseFix-Tray-White.ico")) {
+    Copy-Item `
+        -LiteralPath (Join-Path $repositoryRoot "assets\$trayIconName") `
+        -Destination (Join-Path $trayAssetOutput $trayIconName) `
+        -Force
 }
 
 $engineOutput = Join-Path $appOutput "WinMouseFix.Engine.exe"

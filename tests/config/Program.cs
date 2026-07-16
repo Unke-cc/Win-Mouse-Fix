@@ -21,6 +21,11 @@ try
     Assert(modelDefault.Scroll.HorizontalModifier == "shift" && modelDefault.Scroll.FastModifier == "alt" &&
            modelDefault.Scroll.PrecisionModifier == "win" && modelDefault.Scroll.ZoomModifier == "ctrl",
         "Model default scroll modifiers are incorrect.");
+    Assert(modelDefault.Timing.DragThresholdPx == 12, "Model default drag threshold is incorrect.");
+    modelDefault.Timing.DragThresholdPx = 201;
+    Assert(modelDefault.Timing.DragThresholdPx == 200, "Drag threshold upper bound is incorrect.");
+    modelDefault.Timing.DragThresholdPx = 4;
+    Assert(modelDefault.Timing.DragThresholdPx == 5, "Drag threshold lower bound is incorrect.");
     CheckTriggerOrder();
     CheckNewRemapDefaults();
     CheckHoldScrollMigration();
@@ -88,10 +93,12 @@ try
     invalidField.ReceiveBetaUpdates = true;
     invalidField.Scroll.HorizontalModifier = "invalid";
     invalidField.Scroll.FastModifier = "ctrl";
+    invalidField.Timing.DragThresholdPx = 48;
     await service.SaveAsync(invalidField);
     var roundTrip = await service.LoadAsync();
     Assert(roundTrip.DesktopSwipeDirection == "oppositeMouse", "Direction did not survive save and reload.");
     Assert(roundTrip.ReceiveBetaUpdates, "Beta update preference did not survive save and reload.");
+    Assert(roundTrip.Timing.DragThresholdPx == 48, "Drag threshold did not survive save and reload.");
     Assert(roundTrip.Scroll.HorizontalModifier == "shift" && roundTrip.Scroll.FastModifier == "ctrl",
         "Scroll modifier normalization or persistence is incorrect.");
     roundTrip.Scroll.HorizontalModifier = "shift+ctrl";
@@ -103,6 +110,9 @@ try
     roundTrip.Scroll.HorizontalModifier = "ctrl+A";
     Assert(roundTrip.Scroll.HorizontalModifier == "shift",
         "普通键不能作为滚轮修饰键。");
+    roundTrip.Scroll.HorizontalModifier = "ctrl+mbutton";
+    Assert(roundTrip.Scroll.HorizontalModifier == "ctrl+mbutton",
+        "Mouse button modifier combinations were not normalized correctly.");
     roundTrip.Scroll.HorizontalModifier = "alt";
     roundTrip.Scroll.FastModifier = "alt";
     roundTrip.Normalize();
@@ -146,6 +156,8 @@ static void CheckDefaultFile()
            scroll.GetProperty("precisionModifier").GetString() == "win" &&
            scroll.GetProperty("zoomModifier").GetString() == "ctrl",
         "Default file scroll modifiers are incorrect.");
+    Assert(document.RootElement.GetProperty("timing").GetProperty("dragThresholdPx").GetInt32() == 12,
+        "Default file drag threshold is incorrect.");
 }
 
 static void CheckSchema()
@@ -170,10 +182,15 @@ static void CheckSchema()
     Assert(modifierSchema.GetProperty("type").GetString() == "string" &&
            modifierSchema.GetProperty("pattern").GetString()!.Contains("ctrl|alt|shift|win"),
         "Schema modifier combinations are incorrect.");
+    Assert(modifierSchema.GetProperty("pattern").GetString()!.Contains("mbutton|xbutton1|xbutton2"),
+        "Schema does not define mouse button modifiers.");
+    Assert(root.GetProperty("properties").GetProperty("timing").GetProperty("properties")
+        .GetProperty("dragThresholdPx").GetProperty("minimum").GetInt32() == 5,
+        "Schema drag threshold range is incorrect.");
     var actionTypes = root.GetProperty("$defs").GetProperty("action").GetProperty("properties")
         .GetProperty("type").GetProperty("enum").EnumerateArray()
         .Select(item => item.GetString()).ToArray();
-    Assert(new[] { "VolumeControl", "TabNavigation", "BrowserNavigation", "DesktopSwitch", "DesktopStartMenu", "BrowserTabNavigation" }
+    Assert(new[] { "VolumeControl", "TabNavigation", "BrowserNavigation", "DesktopSwitch", "DesktopStartMenu", "BrowserTabNavigation", "PrecisionScroll" }
             .All(actionTypes.Contains),
         "Schema does not define all fused gesture actions.");
 }
@@ -305,7 +322,7 @@ static void CheckActionOptions()
         "holdScroll", typeof(ActionOption[]), null!, CultureInfo.InvariantCulture))
         .Select(option => option.Type).ToArray();
     Assert(holdScroll.SequenceEqual(new[]
-        { "Zoom", "VolumeControl", "TabNavigation", "BrowserNavigation", "DesktopSwitch", "DesktopStartMenu" }),
+        { "Zoom", "VolumeControl", "TabNavigation", "BrowserNavigation", "DesktopSwitch", "DesktopStartMenu", "FastScroll", "PrecisionScroll" }),
         "Hold-scroll action options are incorrect.");
 
     var holdDrag = ((ActionOption[])converter.Convert(
@@ -317,6 +334,12 @@ static void CheckActionOptions()
     Assert(new[] { "FastScroll", "Zoom", "VolumeControl", "TabNavigation", "BrowserNavigation", "DesktopSwitch", "DesktopStartMenu",
                    "ScrollMove", "DesktopNavigation", "BrowserTabNavigation" }.All(item => !common.Contains(item)),
         "Gesture-only actions were exposed to unrelated operations.");
+
+    var modifierConverter = new ModifierShortcutConverter();
+    Assert((string)modifierConverter.Convert("mbutton", typeof(string), null!, CultureInfo.InvariantCulture) == "中键" &&
+           (string)modifierConverter.Convert("xbutton1", typeof(string), null!, CultureInfo.InvariantCulture) == "按键4（后退键）" &&
+           (string)modifierConverter.Convert("xbutton2", typeof(string), null!, CultureInfo.InvariantCulture) == "按键5（前进键）",
+        "Mouse button modifier display names are incorrect.");
 }
 
 static async Task CheckProfileServiceAsync(string directory)

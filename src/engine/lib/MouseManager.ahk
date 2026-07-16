@@ -332,6 +332,9 @@ class MouseManager {
             this.SuspendWheelHotkeys()
             return
         }
+        if this.appRuleManager.ShouldHandle() && this.TryModifierWheel(direction, true) {
+            return
+        }
         activeButton := this.FindActiveHeldButton()
         if activeButton != "" {
             state := this.states[activeButton]
@@ -357,7 +360,7 @@ class MouseManager {
                 if repeatMode = "perDirection" && state["wheelDirections"].Has(direction) {
                     return
                 }
-                if this.actionManager.Execute(action, Map(
+                if this.ExecuteWheelAction(action, direction, Map(
                     "button", activeButton,
                     "wheelDirection", direction,
                     "trigger", direction = "up" ? "wheelUp" : "wheelDown"
@@ -444,7 +447,7 @@ class MouseManager {
         this.wheelBurstCount := 0
     }
 
-    TryModifierWheel(direction) {
+    TryModifierWheel(direction, mouseOnly := false) {
         matches := [
             Map("modifier", this.scrollConfig["horizontalModifier"], "action", "horizontal"),
             Map("modifier", this.scrollConfig["fastModifier"], "action", "fast"),
@@ -455,6 +458,9 @@ class MouseManager {
         selectedLength := 0
         for match in matches {
             modifier := match["modifier"]
+            if mouseOnly && !this.ModifierContainsMouseButton(modifier) {
+                continue
+            }
             if this.IsModifierPressed(modifier) {
                 length := this.ModifierTokenCount(modifier)
                 if length > selectedLength {
@@ -511,6 +517,18 @@ class MouseManager {
                     if !(GetKeyState("LWin", "P") || GetKeyState("RWin", "P")) {
                         return false
                     }
+                case "mbutton":
+                    if !GetKeyState("MButton", "P") {
+                        return false
+                    }
+                case "xbutton1":
+                    if !GetKeyState("XButton1", "P") {
+                        return false
+                    }
+                case "xbutton2":
+                    if !GetKeyState("XButton2", "P") {
+                        return false
+                    }
                 default:
                     return false
             }
@@ -520,6 +538,28 @@ class MouseManager {
 
     ModifierTokenCount(modifier) {
         return modifier = "" || modifier = "none" ? 0 : StrSplit(modifier, "+").Length
+    }
+
+    ModifierContainsMouseButton(modifier) {
+        for token in StrSplit(modifier, "+") {
+            if Trim(token) = "mbutton" || Trim(token) = "xbutton1" || Trim(token) = "xbutton2" {
+                return true
+            }
+        }
+        return false
+    }
+
+    ExecuteWheelAction(action, direction, context) {
+        switch action["type"] {
+            case "FastScroll":
+                this.SendRegularWheel(direction, 4.0, "fast")
+                return true
+            case "PrecisionScroll":
+                this.SendRegularWheel(direction, 0.25, "precision")
+                return true
+            default:
+                return this.actionManager.Execute(action, context)
+        }
     }
 
     ApplyScrollDirection(direction) {
@@ -619,7 +659,7 @@ class MouseManager {
 
     GetWheelRepeatMode(action) {
         switch action["type"] {
-            case "Original", "FastScroll", "Zoom", "VolumeUp", "VolumeDown",
+            case "Original", "FastScroll", "PrecisionScroll", "Zoom", "VolumeUp", "VolumeDown",
                 "VolumeControl", "TabNavigation", "BrowserNavigation", "DesktopSwitch":
                 return "perStep"
             case "DesktopStartMenu":

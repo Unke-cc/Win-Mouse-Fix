@@ -46,6 +46,9 @@
     "precisionModifier": "win",
     "zoomModifier": "ctrl"
   },
+  "timing": {
+    "dragThresholdPx": 12
+  },
   "excludedApps": [],
   "startup": {
     "runAtLogin": false

@@ -1,6 +1,6 @@
 #define MyAppName "Win Mouse Fix"
-#define MyAppVersion "0.1.3"
-#define MyAppDisplayVersion "0.1.3 Beta"
+#define MyAppVersion "0.1.4"
+#define MyAppDisplayVersion "0.1.4 Beta"
 #define MyAppExeName "WinMouseFix.exe"
 
 [Setup]
@@ -18,7 +18,7 @@ ArchitecturesAllowed=x64os
 ArchitecturesInstallIn64BitMode=x64os
 MinVersion=10.0.19045
 OutputDir=..\dist
-OutputBaseFilename=WinMouseFix-Setup-0.1.3-beta
+OutputBaseFilename=WinMouseFix-Setup-0.1.4-beta
 SetupIconFile=..\assets\WinMouseFix.ico
 Compression=lzma2
 SolidCompression=yes
@@ -84,7 +84,7 @@ var
   ResultCode: Integer;
   ApplicationPath: String;
 begin
-  ApplicationPath := ExpandConstant('{app}\{#MyAppExeName}');
+  ApplicationPath := ExpandConstant('{app}\WinMouseFix.Tray.exe');
   if FileExists(ApplicationPath) then
   begin
     Exec(
@@ -102,6 +102,7 @@ begin
   RequestApplicationShutdown;
   Sleep(5000);
   StopApplication('{#MyAppExeName}');
+  StopApplication('WinMouseFix.Tray.exe');
   StopApplication('WinMouseFix.Engine.exe');
 end;
 

@@ -1,6 +1,6 @@
 # Win Mouse Fix 技术选择
 
-适用版本：`0.1.3 Beta`。本文记录当前实际采用的组成和仍未实现的技术方向。
+适用版本：`0.1.4 Beta`。本文记录当前实际采用的组成和仍未实现的技术方向。
 
 ## 1. 已确定的技术方案
 
@@ -8,7 +8,8 @@ Win Mouse Fix 只面向 Windows，以 **AutoHotkey v2** 作为固定的鼠标核
 
 | 部分 | 技术 | 用途 |
 | --- | --- | --- |
-| GUI | .NET Framework 4.8 + WPF | 设置窗口、托盘、状态提示和核心进程管理 |
+| GUI | .NET Framework 4.8 + WPF | 设置窗口、状态提示和配置管理 |
+| 常驻控制 | .NET Framework 4.8 + Windows Forms `NotifyIcon` | 独立进程保留托盘和核心进程控制 |
 | 页面状态 | WPF 数据绑定 | 页面状态和界面更新 |
 | 配置 | System.Text.Json | 读取、检查和写入 JSON 配置 |
 | 设置生效 | JSON 文件监听 | GUI 保存配置后，核心在 250 毫秒内检查并读取 |

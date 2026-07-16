@@ -12,16 +12,14 @@ using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using WinMouseFix.Gui.Models;
 using WinMouseFix.Gui.Services;
-using Drawing = System.Drawing;
-using Forms = System.Windows.Forms;
 
 namespace WinMouseFix.Gui;
 
 public partial class MainWindow : Window
 {
     private readonly ConfigurationService configurationService = new();
-    private readonly CoreProcessService coreProcessService = new();
-    private readonly ProfileService profileService = new();
+    private readonly CoreProcessService coreProcessService;
+    private readonly ProfileService profileService;
     private readonly MouseDeviceService mouseDeviceService = new();
     private readonly StartupService startupService = new();
     private readonly UpdateService updateService = new();
@@ -29,16 +27,14 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer statusTimer;
     private readonly DispatcherTimer captureClickTimer;
     private readonly DispatcherTimer captureHoldTimer;
+    private readonly DispatcherTimer coreStatusTimer;
     private readonly SemaphoreSlim saveLock = new(1, 1);
-    private readonly Forms.NotifyIcon trayIcon;
-    private readonly Forms.ToolStripMenuItem trayToggleItem;
-    private readonly Forms.ContextMenuStrip trayMenu;
     private AppConfig config = new();
     private AppConfig lastSavedConfig = new();
     private INotifyCollectionChanged? observedRemaps;
     private bool loading = true;
     private bool exiting;
-    private bool trayHintShown;
+    private bool enteringLightweightMode;
     private bool pointerInCaptureArea;
     private string? capturedButton;
     private string? pendingClickButton;
@@ -56,19 +52,20 @@ public partial class MainWindow : Window
     private UpdateSource? aboutSource;
     private bool aboutSourceResolved;
 
+    internal event EventHandler? WindowHiddenToTray;
+    internal event EventHandler? ActivityDetected;
+
     internal bool StartHidden { get; set; }
 
-    public MainWindow()
+    public MainWindow(CoreProcessService coreProcessService, ProfileService profileService)
     {
+        this.coreProcessService = coreProcessService;
+        this.profileService = profileService;
         saveTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
         saveTimer.Tick += SaveTimer_Tick;
 
         statusTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(4) };
-        statusTimer.Tick += (_, _) =>
-        {
-            statusTimer.Stop();
-            StatusBar.Visibility = Visibility.Collapsed;
-        };
+        statusTimer.Tick += StatusTimer_Tick;
 
         captureClickTimer = new DispatcherTimer();
         captureClickTimer.Tick += CaptureClickTimer_Tick;
@@ -76,51 +73,10 @@ public partial class MainWindow : Window
         captureHoldTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
         captureHoldTimer.Tick += CaptureHoldTimer_Tick;
 
-        trayToggleItem = new Forms.ToolStripMenuItem("停止 Win Mouse Fix", null, (_, _) => RunTrayAction(ToggleEnabledFromTray));
-        trayMenu = new Forms.ContextMenuStrip
-        {
-            AutoClose = true,
-            ShowCheckMargin = false,
-            ShowImageMargin = false
-        };
-        trayMenu.Items.Add(new Forms.ToolStripMenuItem("打开设置", null, (_, _) => RunTrayAction(ShowSettingsWindow)) { Font = new Drawing.Font("Segoe UI", 9F, Drawing.FontStyle.Bold) });
-        trayMenu.Items.Add(trayToggleItem);
-        trayMenu.Items.Add(new Forms.ToolStripSeparator());
-        trayMenu.Items.Add(new Forms.ToolStripMenuItem("退出", null, (_, _) => RunTrayAction(() => _ = ExitApplicationAsync())));
-
-        trayIcon = new Forms.NotifyIcon
-        {
-            Text = "Win Mouse Fix",
-            Icon = LoadTrayIcon(),
-            ContextMenuStrip = trayMenu,
-            Visible = true
-        };
-        trayIcon.DoubleClick += (_, _) => Dispatcher.BeginInvoke(ShowSettingsWindow);
+        coreStatusTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        coreStatusTimer.Tick += CoreStatusTimer_Tick;
 
         InitializeComponent();
-        coreProcessService.StatusChanged += (_, _) => Dispatcher.BeginInvoke(SyncRunningState);
-    }
-
-    internal static Drawing.Icon LoadTrayIcon()
-    {
-        try
-        {
-            var resource = System.Windows.Application.GetResourceStream(
-                new Uri("pack://application:,,,/assets/WinMouseFix-Tray.ico"));
-            if (resource is not null)
-            {
-                using (resource.Stream)
-                using (var icon = new Drawing.Icon(resource.Stream))
-                {
-                    return (Drawing.Icon)icon.Clone();
-                }
-            }
-        }
-        catch (Exception ex) when (ex is ArgumentException or IOException or NotSupportedException)
-        {
-        }
-
-        return (Drawing.Icon)Drawing.SystemIcons.Application.Clone();
     }
 
     private async void Window_Loaded(object sender, RoutedEventArgs e)
@@ -167,6 +123,7 @@ public partial class MainWindow : Window
         UpdateApplicationEmptyState();
         UpdateRemapEmptyState();
         UpdateCoreStatus();
+        coreStatusTimer.Start();
 
         var startupResult = startupService.SetRunAtLogin(config.Startup.RunAtLogin);
         if (!startupResult.Applied)
@@ -185,6 +142,7 @@ public partial class MainWindow : Window
             Opacity = 1;
             ShowActivated = true;
             ShowInTaskbar = true;
+            WindowHiddenToTray?.Invoke(this, EventArgs.Empty);
         }
     }
 
@@ -192,6 +150,7 @@ public partial class MainWindow : Window
     {
         appConfig.PropertyChanged += Config_PropertyChanged;
         appConfig.Scroll.PropertyChanged += Config_PropertyChanged;
+        appConfig.Timing.PropertyChanged += Config_PropertyChanged;
         appConfig.Startup.PropertyChanged += Config_PropertyChanged;
         appConfig.ExcludedApps.CollectionChanged += ExcludedApps_CollectionChanged;
         BindRemapsCollection();
@@ -201,6 +160,7 @@ public partial class MainWindow : Window
     {
         appConfig.PropertyChanged -= Config_PropertyChanged;
         appConfig.Scroll.PropertyChanged -= Config_PropertyChanged;
+        appConfig.Timing.PropertyChanged -= Config_PropertyChanged;
         appConfig.Startup.PropertyChanged -= Config_PropertyChanged;
         appConfig.ExcludedApps.CollectionChanged -= ExcludedApps_CollectionChanged;
         if (observedRemaps is not null)
@@ -251,9 +211,9 @@ public partial class MainWindow : Window
         if (!loading && sender == config.Scroll && IsModifierProperty(e.PropertyName))
         {
             RejectDuplicateModifier(e.PropertyName!);
+            WarnMouseModifierConflict(e.PropertyName!);
         }
 
-        UpdateTrayMenu();
         ScheduleSave();
     }
 
@@ -306,7 +266,7 @@ public partial class MainWindow : Window
         await SaveConfigurationAsync(showConfirmation: false);
     }
 
-    private async Task SaveConfigurationAsync(bool showConfirmation)
+    private async Task<bool> SaveConfigurationAsync(bool showConfirmation)
     {
         await saveLock.WaitAsync();
         try
@@ -317,21 +277,31 @@ public partial class MainWindow : Window
             {
                 ShowStatus("设置已保存");
             }
+
+            return true;
         }
         catch (IOException ex)
         {
             RestoreLastSavedConfiguration();
             ShowStatus($"无法保存设置：{ex.Message}");
+            return false;
         }
         catch (UnauthorizedAccessException ex)
         {
             RestoreLastSavedConfiguration();
             ShowStatus($"无法保存设置：{ex.Message}");
+            return false;
         }
         finally
         {
             saveLock.Release();
         }
+    }
+
+    private void StatusTimer_Tick(object? sender, EventArgs e)
+    {
+        statusTimer.Stop();
+        StatusBar.Visibility = Visibility.Collapsed;
     }
 
     private static AppConfig CloneConfig(AppConfig source)
@@ -898,7 +868,7 @@ public partial class MainWindow : Window
         };
         if (token is null)
         {
-            ShowStatus("只能使用 Ctrl、Alt、Shift 或 Win 组合，普通键不能使用");
+            ShowStatus("可使用 Ctrl、Alt、Shift、Win 或中键、按键4、按键5");
             shortcutBox.Focus();
             return;
         }
@@ -925,7 +895,51 @@ public partial class MainWindow : Window
         shortcutBox.Focus();
     }
 
-    private static readonly string[] ModifierOrder = { "ctrl", "alt", "shift", "win" };
+    private void ModifierShortcutBox_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is not System.Windows.Controls.TextBox { Tag: string propertyName } shortcutBox)
+        {
+            return;
+        }
+
+        var mouseToken = e.ChangedButton switch
+        {
+            MouseButton.Middle => "mbutton",
+            MouseButton.XButton1 => "xbutton1",
+            MouseButton.XButton2 => "xbutton2",
+            _ => null
+        };
+        if (mouseToken is null)
+        {
+            return;
+        }
+
+        e.Handled = true;
+        var pressed = new HashSet<string>(StringComparer.Ordinal);
+        if (Keyboard.IsKeyDown(Key.LeftCtrl) || Keyboard.IsKeyDown(Key.RightCtrl))
+        {
+            pressed.Add("ctrl");
+        }
+        if (Keyboard.IsKeyDown(Key.LeftAlt) || Keyboard.IsKeyDown(Key.RightAlt))
+        {
+            pressed.Add("alt");
+        }
+        if (Keyboard.IsKeyDown(Key.LeftShift) || Keyboard.IsKeyDown(Key.RightShift))
+        {
+            pressed.Add("shift");
+        }
+        if (Keyboard.IsKeyDown(Key.LWin) || Keyboard.IsKeyDown(Key.RWin))
+        {
+            pressed.Add("win");
+        }
+        pressed.Add(mouseToken);
+
+        SetScrollModifier(propertyName, string.Join("+", ModifierOrder.Where(pressed.Contains)));
+        shortcutBox.Focus();
+    }
+
+    private static readonly string[] ModifierOrder =
+        { "ctrl", "alt", "shift", "win", "mbutton", "xbutton1", "xbutton2" };
 
     private void SetScrollModifier(string propertyName, string value)
     {
@@ -979,6 +993,31 @@ public partial class MainWindow : Window
         }
         loading = false;
         ShowStatus("该修饰键已用于其他滚轮动作，本项已设为关闭");
+    }
+
+    private void WarnMouseModifierConflict(string propertyName)
+    {
+        var selected = propertyName switch
+        {
+            nameof(ScrollConfig.HorizontalModifier) => config.Scroll.HorizontalModifier,
+            nameof(ScrollConfig.FastModifier) => config.Scroll.FastModifier,
+            nameof(ScrollConfig.PrecisionModifier) => config.Scroll.PrecisionModifier,
+            nameof(ScrollConfig.ZoomModifier) => config.Scroll.ZoomModifier,
+            _ => "none"
+        };
+        var button = selected switch
+        {
+            "mbutton" => "MButton",
+            "xbutton1" => "XButton1",
+            "xbutton2" => "XButton2",
+            _ => null
+        };
+        if (button is not null && config.Remaps.Any(remap =>
+                string.Equals(remap.Button, button, StringComparison.OrdinalIgnoreCase) &&
+                remap.Trigger == "holdScroll" && remap.Action.Type != "None"))
+        {
+            ShowStatus("该鼠标按钮同时设置了按住并滚动，滚动时优先使用修饰键功能");
+        }
     }
 
     private void OpenButtonOptions_Click(object sender, RoutedEventArgs e)
@@ -1076,11 +1115,11 @@ public partial class MainWindow : Window
     {
         var running = coreProcessService.IsRunning;
         AppStatusDot.Fill = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(running ? "#168554" : "#98A2B3"));
-        AppStatusText.Text = running ? "已启动" : "已停止";
-        UpdateTrayMenu();
     }
 
-    private void SyncRunningState()
+    private void CoreStatusTimer_Tick(object? sender, EventArgs e) => SyncRunningState();
+
+    internal void SyncRunningState()
     {
         if (!loading && !exiting)
         {
@@ -1280,29 +1319,6 @@ public partial class MainWindow : Window
         }
     }
 
-    private void ToggleEnabledFromTray()
-    {
-        SetAppEnabled(!coreProcessService.IsRunning, showMessage: false);
-    }
-
-    private void RunTrayAction(Action action)
-    {
-        trayMenu.Close(Forms.ToolStripDropDownCloseReason.ItemClicked);
-        Dispatcher.BeginInvoke(action, DispatcherPriority.Normal);
-    }
-
-    private void UpdateTrayMenu()
-    {
-        if (trayIcon is null)
-        {
-            return;
-        }
-
-        var running = coreProcessService.IsRunning;
-        trayToggleItem.Text = running ? "停止 Win Mouse Fix" : "启动 Win Mouse Fix";
-        trayIcon.Text = running ? "Win Mouse Fix - 已启动" : "Win Mouse Fix - 已停止";
-    }
-
     internal void ShowSettingsWindow()
     {
         StartHidden = false;
@@ -1310,6 +1326,7 @@ public partial class MainWindow : Window
         ShowActivated = true;
         ShowInTaskbar = true;
         Show();
+        coreStatusTimer.Start();
         if (WindowState == WindowState.Minimized)
         {
             WindowState = WindowState.Normal;
@@ -1321,9 +1338,42 @@ public partial class MainWindow : Window
         Focus();
     }
 
-    internal void RequestApplicationShutdown() => _ = ExitApplicationAsync();
+    internal async Task<bool> EnterLightweightModeAsync()
+    {
+        if (exiting || enteringLightweightMode)
+        {
+            return false;
+        }
 
-    private async Task ExitApplicationAsync()
+        if (!await SaveConfigurationAsync(showConfirmation: false))
+        {
+            return false;
+        }
+
+        enteringLightweightMode = true;
+        saveTimer.Stop();
+        statusTimer.Stop();
+        captureClickTimer.Stop();
+        captureHoldTimer.Stop();
+        coreStatusTimer.Stop();
+        saveTimer.Tick -= SaveTimer_Tick;
+        statusTimer.Tick -= StatusTimer_Tick;
+        captureClickTimer.Tick -= CaptureClickTimer_Tick;
+        captureHoldTimer.Tick -= CaptureHoldTimer_Tick;
+        coreStatusTimer.Tick -= CoreStatusTimer_Tick;
+        foreach (var ownedWindow in OwnedWindows.Cast<Window>().ToArray())
+        {
+            ownedWindow.Close();
+        }
+
+        UnsubscribeFromConfig(config);
+        DataContext = null;
+        coreProcessService.Resume();
+        Close();
+        return true;
+    }
+
+    internal async Task PrepareForApplicationShutdownAsync()
     {
         if (exiting)
         {
@@ -1332,20 +1382,23 @@ public partial class MainWindow : Window
 
         exiting = true;
         saveTimer.Stop();
+        statusTimer.Stop();
         captureClickTimer.Stop();
         captureHoldTimer.Stop();
+        coreStatusTimer.Stop();
+        foreach (var ownedWindow in OwnedWindows.Cast<Window>().ToArray())
+        {
+            ownedWindow.Close();
+        }
+
         coreProcessService.Resume();
         await SaveConfigurationAsync(showConfirmation: false);
-        coreProcessService.Stop();
-        trayIcon.Visible = false;
-        trayIcon.Icon?.Dispose();
-        trayIcon.Dispose();
-        System.Windows.Application.Current.Shutdown();
+        Close();
     }
 
     private void Window_Closing(object? sender, CancelEventArgs e)
     {
-        if (exiting)
+        if (exiting || enteringLightweightMode)
         {
             return;
         }
@@ -1356,12 +1409,15 @@ public partial class MainWindow : Window
         ResetCapturedGestureState();
         coreProcessService.Resume();
         Hide();
+        coreStatusTimer.Stop();
         ScheduleSave();
+        WindowHiddenToTray?.Invoke(this, EventArgs.Empty);
 
-        if (!trayHintShown)
-        {
-            trayHintShown = true;
-            trayIcon.ShowBalloonTip(2500, "Win Mouse Fix 仍在运行", "可以从系统托盘重新打开设置或退出。", Forms.ToolTipIcon.Info);
-        }
     }
+
+    private void Window_MouseActivity(object sender, System.Windows.Input.MouseEventArgs e) =>
+        ActivityDetected?.Invoke(this, EventArgs.Empty);
+
+    private void Window_KeyActivity(object sender, System.Windows.Input.KeyEventArgs e) =>
+        ActivityDetected?.Invoke(this, EventArgs.Empty);
 }

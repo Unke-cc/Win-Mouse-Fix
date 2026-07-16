@@ -367,7 +367,7 @@ public sealed class ProfileService
             };
         var allowedFields = version == 1
             ? requiredFields
-            : requiredFields.Concat(new[] { "receiveBetaUpdates" }).ToArray();
+            : requiredFields.Concat(new[] { "receiveBetaUpdates", "timing" }).ToArray();
 
         if (version != 1 && version != AppConfig.CurrentVersion)
         {

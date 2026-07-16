@@ -10,7 +10,19 @@ public sealed class CoreProcessService
     private const uint ResumeMessage = 0x8003;
     private Process? process;
 
-    public bool IsRunning => process is { HasExited: false };
+    public bool IsRunning
+    {
+        get
+        {
+            if (process is { HasExited: false })
+            {
+                return true;
+            }
+
+            using var runningProcess = FindExternalProcess();
+            return runningProcess is not null;
+        }
+    }
 
     public event EventHandler? StatusChanged;
 
@@ -57,7 +69,8 @@ public sealed class CoreProcessService
 
     public (bool Stopped, string Message) Stop()
     {
-        if (!IsRunning)
+        var engineProcess = process is { HasExited: false } ? process : FindExternalProcess();
+        if (engineProcess is null)
         {
             process = null;
             StatusChanged?.Invoke(this, EventArgs.Empty);
@@ -66,7 +79,6 @@ public sealed class CoreProcessService
 
         try
         {
-            var engineProcess = process!;
             var closeRequested = engineProcess.CloseMainWindow();
             if (!closeRequested && !engineProcess.HasExited)
             {
@@ -98,30 +110,62 @@ public sealed class CoreProcessService
 
     private bool PostEngineMessage(uint message)
     {
-        if (!IsRunning)
+        var engineProcess = process is { HasExited: false } ? process : FindExternalProcess();
+        if (engineProcess is null)
         {
             return false;
         }
 
-        var sent = false;
-        EnumWindows((window, _) =>
+        try
         {
-            GetWindowThreadProcessId(window, out var processId);
-            if (processId == process!.Id)
+            var sent = false;
+            EnumWindows((window, _) =>
             {
-                var result = SendMessageTimeout(
-                    window,
-                    message,
-                    IntPtr.Zero,
-                    IntPtr.Zero,
-                    0x0002,
-                    250,
-                    out _);
-                sent |= result != IntPtr.Zero;
+                GetWindowThreadProcessId(window, out var processId);
+                if (processId == engineProcess.Id)
+                {
+                    var result = SendMessageTimeout(
+                        window,
+                        message,
+                        IntPtr.Zero,
+                        IntPtr.Zero,
+                        0x0002,
+                        250,
+                        out _);
+                    sent |= result != IntPtr.Zero;
+                }
+                return true;
+            }, IntPtr.Zero);
+            return sent;
+        }
+        finally
+        {
+            if (!ReferenceEquals(engineProcess, process))
+            {
+                engineProcess.Dispose();
             }
-            return true;
-        }, IntPtr.Zero);
-        return sent;
+        }
+    }
+
+    private Process? FindExternalProcess()
+    {
+        foreach (var candidate in Process.GetProcessesByName("WinMouseFix.Engine"))
+        {
+            try
+            {
+                if (!candidate.HasExited)
+                {
+                    return candidate;
+                }
+            }
+            catch (InvalidOperationException)
+            {
+            }
+
+            candidate.Dispose();
+        }
+
+        return null;
     }
 
     private static LaunchTarget? FindLaunchTarget()

@@ -25,6 +25,9 @@ public sealed class ModifierShortcutConverter : IValueConverter
         "alt" => "Alt",
         "shift" => "Shift",
         "win" => "Win",
+        "mbutton" => "中键",
+        "xbutton1" => "按键4（后退键）",
+        "xbutton2" => "按键5（前进键）",
         _ => token
     };
 }

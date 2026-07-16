@@ -40,6 +40,13 @@
         "zoomModifier": { "$ref": "#/$defs/modifier" }
       }
     },
+    "timing": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "dragThresholdPx": { "type": "integer", "minimum": 5, "maximum": 200 }
+      }
+    },
     "excludedApps": {
       "type": "array",
       "items": {
@@ -116,6 +123,7 @@
             "VolumeMute",
             "MediaPlayPause",
             "FastScroll",
+            "PrecisionScroll",
             "Zoom",
             "VolumeControl",
             "TabNavigation",
@@ -133,7 +141,7 @@
     },
     "modifier": {
       "type": "string",
-      "pattern": "^(none|(?:ctrl|alt|shift|win)(?:\\+(?:ctrl|alt|shift|win))*)$"
+      "pattern": "^(none|(?:ctrl|alt|shift|win|mbutton|xbutton1|xbutton2)(?:\\+(?:ctrl|alt|shift|win|mbutton|xbutton1|xbutton2))*)$"
     }
   }
 }

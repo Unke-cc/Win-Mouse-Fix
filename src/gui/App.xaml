@@ -118,6 +118,63 @@
             <Setter Property="Cursor" Value="Hand" />
         </Style>
 
+        <Style x:Key="ScrollSpeedSliderTrackButton" TargetType="RepeatButton">
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RepeatButton">
+                        <Border Background="{TemplateBinding Background}" CornerRadius="4" />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="ScrollSpeedSliderThumb" TargetType="Thumb">
+            <Setter Property="Width" Value="18" />
+            <Setter Property="Height" Value="18" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Thumb">
+                        <Border Background="White" BorderBrush="{StaticResource PrimaryBrush}" BorderThickness="2"
+                                CornerRadius="9">
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="6" ShadowDepth="1" Opacity="0.18" />
+                            </Border.Effect>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="ScrollSpeedSlider" TargetType="Slider">
+            <Setter Property="Height" Value="28" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Slider">
+                        <Grid Height="28" ClipToBounds="False">
+                            <Track x:Name="PART_Track" VerticalAlignment="Center" Height="6">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Command="Slider.DecreaseLarge"
+                                                  Background="{StaticResource PrimaryBrush}"
+                                                  Style="{StaticResource ScrollSpeedSliderTrackButton}" />
+                                </Track.DecreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb Style="{StaticResource ScrollSpeedSliderThumb}" />
+                                </Track.Thumb>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Command="Slider.IncreaseLarge"
+                                                  Background="#E3E7ED"
+                                                  Style="{StaticResource ScrollSpeedSliderTrackButton}" />
+                                </Track.IncreaseRepeatButton>
+                            </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <Style x:Key="ToggleSwitch" TargetType="CheckBox">
             <Setter Property="Width" Value="48" />
             <Setter Property="Height" Value="26" />

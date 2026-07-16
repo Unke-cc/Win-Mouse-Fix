@@ -23,7 +23,7 @@ by posting these messages to the engine window:
 按住并滚动使用一个融合动作处理上下方向；按住并拖动使用一个融合动作处理上下左右。
 The double-click choices are fast (150 ms), medium (250 ms), and slow (400 ms).
 应用排除和全屏暂停会在每次输入前检查。
-滚轮修饰键支持由 Ctrl、Alt、Shift、Win 组成的组合；快速滚动和精确滚动发送不带对应修饰键的普通滚轮，缩放保留 Ctrl 组合。
+滚轮修饰键支持由 Ctrl、Alt、Shift、Win、中键、按键4、按键5组成的组合；快速滚动和精确滚动发送不带对应修饰键的普通滚轮，缩放保留 Ctrl 组合。按住并滚动也可直接选择快速滚动或精确滚动动作。
 触摸板连续高频滚轮输入使用保护策略，达到阈值后暂时停止软件滚轮接管，让系统恢复原生滚动。
 `scroll.smooth` 开启后，额外滚轮步进会以短间隔发送。
 

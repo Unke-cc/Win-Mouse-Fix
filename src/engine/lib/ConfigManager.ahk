@@ -38,6 +38,7 @@ class ConfigManager {
         "MediaPlayPause", true,
         "CustomShortcut", true,
         "FastScroll", true,
+        "PrecisionScroll", true,
         "Zoom", true,
         "VolumeControl", true,
         "TabNavigation", true,
@@ -298,7 +299,8 @@ class ConfigManager {
         seen := Map()
         for token in tokens {
             token := Trim(token)
-            if token != "ctrl" && token != "alt" && token != "shift" && token != "win" {
+            if (token != "ctrl" && token != "alt" && token != "shift" && token != "win"
+                && token != "mbutton" && token != "xbutton1" && token != "xbutton2") {
                 return fallback
             }
             if seen.Has(token) {
@@ -308,7 +310,7 @@ class ConfigManager {
         }
 
         result := ""
-        for token in ["ctrl", "alt", "shift", "win"] {
+        for token in ["ctrl", "alt", "shift", "win", "mbutton", "xbutton1", "xbutton2"] {
             if seen.Has(token) {
                 result .= result = "" ? token : "+" token
             }

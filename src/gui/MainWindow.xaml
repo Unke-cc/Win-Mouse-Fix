@@ -7,6 +7,10 @@
         Width="720" Height="640" MinWidth="660" MinHeight="480"
         WindowStartupLocation="CenterScreen"
         Loaded="Window_Loaded"
+        PreviewMouseMove="Window_MouseActivity"
+        PreviewMouseDown="Window_MouseActivity"
+        PreviewMouseWheel="Window_MouseActivity"
+        PreviewKeyDown="Window_KeyActivity"
         Closing="Window_Closing">
     <Window.Resources>
         <controls:TriggerActionOptionsConverter x:Key="TriggerActionOptionsConverter" />
@@ -103,8 +107,7 @@
                 </Border>
 
                 <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                    <Ellipse x:Name="AppStatusDot" Width="7" Height="7" Margin="0,0,6,0" Fill="#98A2B3" />
-                    <TextBlock x:Name="AppStatusText" Text="已停止" FontSize="11" FontWeight="SemiBold" />
+                    <Ellipse x:Name="AppStatusDot" Width="7" Height="7" Fill="#98A2B3" />
                 </StackPanel>
             </Grid>
         </Border>
@@ -360,7 +363,7 @@
                           HorizontalScrollBarVisibility="Disabled"
                           HorizontalContentAlignment="Center">
                 <StackPanel Width="620" Margin="0,24,0,28">
-                    <TextBlock Text="调整普通滚轮，以及键盘修饰键配合滚轮执行的动作。" Style="{StaticResource PageDescription}" />
+                    <TextBlock Text="调整普通滚轮，以及修饰键配合滚轮执行的动作。" Style="{StaticResource PageDescription}" />
 
                     <Border Style="{StaticResource Card}">
                         <Grid>
@@ -387,6 +390,7 @@
                                            FontWeight="SemiBold" Foreground="{StaticResource PrimaryBrush}" VerticalAlignment="Center" />
                             </Grid>
                             <Slider Minimum="0.25" Maximum="4" TickFrequency="0.25" IsSnapToTickEnabled="True"
+                                    Style="{StaticResource ScrollSpeedSlider}"
                                     Value="{Binding Scroll.Speed, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                     ValueChanged="ScrollSpeed_ValueChanged" />
                             <Grid Margin="0,6,0,0">
@@ -411,8 +415,8 @@
 
                     <Border Style="{StaticResource Card}">
                         <StackPanel>
-                            <TextBlock Text="键盘修饰键" Style="{StaticResource SectionTitle}" />
-                            <TextBlock Text="按住 Ctrl、Alt、Shift 或 Win 的组合并滚动滚轮，即可执行对应动作；普通键不能使用。"
+                            <TextBlock Text="修饰键" Style="{StaticResource SectionTitle}" />
+                            <TextBlock Text="按住 Ctrl、Alt、Shift、Win，或中键、按键4、按键5并滚动滚轮，即可执行对应动作。"
                                        Foreground="{StaticResource MutedTextBrush}" Margin="0,4,0,14" />
                             <Grid>
                                 <Grid.ColumnDefinitions>
@@ -433,7 +437,8 @@
                                     <TextBox Grid.Column="1" Tag="HorizontalModifier" IsReadOnly="True"
                                              Text="{Binding Scroll.HorizontalModifier, Converter={StaticResource ModifierShortcutConverter}}"
                                              PreviewKeyDown="ModifierShortcutBox_PreviewKeyDown"
-                                             ToolTip="按下 Ctrl、Alt、Shift 或 Win 组合；按 Delete 清除" />
+                                             PreviewMouseDown="ModifierShortcutBox_PreviewMouseDown"
+                                             ToolTip="按下键盘修饰键或鼠标按钮；按 Delete 清除" />
                                 </Grid>
 
                                 <Grid Grid.Column="1" Margin="10,0,0,12">
@@ -445,7 +450,8 @@
                                     <TextBox Grid.Column="1" Tag="FastModifier" IsReadOnly="True"
                                              Text="{Binding Scroll.FastModifier, Converter={StaticResource ModifierShortcutConverter}}"
                                              PreviewKeyDown="ModifierShortcutBox_PreviewKeyDown"
-                                             ToolTip="按下 Ctrl、Alt、Shift 或 Win 组合；按 Delete 清除" />
+                                             PreviewMouseDown="ModifierShortcutBox_PreviewMouseDown"
+                                             ToolTip="按下键盘修饰键或鼠标按钮；按 Delete 清除" />
                                 </Grid>
 
                                 <Grid Grid.Row="1" Margin="0,0,10,0">
@@ -457,7 +463,8 @@
                                     <TextBox Grid.Column="1" Tag="PrecisionModifier" IsReadOnly="True"
                                              Text="{Binding Scroll.PrecisionModifier, Converter={StaticResource ModifierShortcutConverter}}"
                                              PreviewKeyDown="ModifierShortcutBox_PreviewKeyDown"
-                                             ToolTip="按下 Ctrl、Alt、Shift 或 Win 组合；按 Delete 清除" />
+                                             PreviewMouseDown="ModifierShortcutBox_PreviewMouseDown"
+                                             ToolTip="按下键盘修饰键或鼠标按钮；按 Delete 清除" />
                                 </Grid>
 
                                 <Grid Grid.Row="1" Grid.Column="1" Margin="10,0,0,0">
@@ -469,7 +476,8 @@
                                     <TextBox Grid.Column="1" Tag="ZoomModifier" IsReadOnly="True"
                                              Text="{Binding Scroll.ZoomModifier, Converter={StaticResource ModifierShortcutConverter}}"
                                              PreviewKeyDown="ModifierShortcutBox_PreviewKeyDown"
-                                             ToolTip="按下 Ctrl、Alt、Shift 或 Win 组合；按 Delete 清除" />
+                                             PreviewMouseDown="ModifierShortcutBox_PreviewMouseDown"
+                                             ToolTip="按下键盘修饰键或鼠标按钮；按 Delete 清除" />
                                 </Grid>
                             </Grid>
                         </StackPanel>
@@ -481,9 +489,6 @@
                           HorizontalScrollBarVisibility="Disabled"
                           HorizontalContentAlignment="Center">
                 <StackPanel Width="620" Margin="0,24,0,28">
-                    <TextBlock Text="Win Mouse Fix 使用 AutoHotkey v2 提供鼠标按钮与滚动功能。"
-                               Style="{StaticResource PageDescription}" />
-
                     <Border Style="{StaticResource Card}">
                         <StackPanel>
                             <Grid Margin="0,0,0,18">
@@ -512,7 +517,12 @@
                                 <TextBlock Grid.Row="1" Text="许可状态" Foreground="{StaticResource MutedTextBrush}" Margin="0,0,0,10" />
                                 <TextBlock Grid.Row="1" Grid.Column="1" Text="个人非商业使用免费；其他用途需另行许可" Margin="0,0,0,10" />
                                 <TextBlock Grid.Row="2" Text="项目主页" Foreground="{StaticResource MutedTextBrush}" />
-                                <TextBlock x:Name="ProjectHomepageText" Grid.Row="2" Grid.Column="1" Text="正在检测 GitHub / Gitee" />
+                                <StackPanel Grid.Row="2" Grid.Column="1">
+                                    <TextBlock x:Name="ProjectHomepageText" Text="正在检测 GitHub / Gitee" />
+                                    <TextBlock x:Name="AboutSourceStatusText" Margin="0,3,0,0"
+                                               Foreground="{StaticResource MutedTextBrush}"
+                                               Text="将根据网络自动选择 GitHub 或 Gitee" />
+                                </StackPanel>
                             </Grid>
 
                             <StackPanel Orientation="Horizontal" Margin="0,20,0,0">
@@ -521,9 +531,6 @@
                                 <Button x:Name="OpenProjectHomepageButton" Content="打开项目主页" Click="OpenProjectHomepage_Click" Margin="0,0,10,0" />
                                 <Button x:Name="OpenLicenseButton" Content="查看许可" Click="OpenLicense_Click" />
                             </StackPanel>
-                            <TextBlock x:Name="AboutSourceStatusText" Margin="0,12,0,0"
-                                       Foreground="{StaticResource MutedTextBrush}"
-                                       Text="将根据网络自动选择 GitHub 或 Gitee" />
                         </StackPanel>
                     </Border>
 

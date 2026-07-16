@@ -8,9 +8,9 @@ Copyright (c) 2026 胡文凯。保留所有未明确授予的权利。
 
 Copyright (c) 2026 Hu Wenkai. All rights not expressly granted are reserved.
 
-本许可适用于 Win Mouse Fix `0.1.0`、`0.1.1`、`0.1.2 Beta` 和 `0.1.3 Beta` 中由胡文凯拥有版权的代码、文档和资源。第三方组件适用其各自许可，见 [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md)。
+本许可适用于 Win Mouse Fix `0.1.0`、`0.1.1`、`0.1.2 Beta`、`0.1.3 Beta` 和 `0.1.4 Beta` 中由胡文凯拥有版权的代码、文档和资源。第三方组件适用其各自许可，见 [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md)。
 
-This license applies to the code, documentation, and resources in Win Mouse Fix `0.1.0`, `0.1.1`, `0.1.2 Beta`, and `0.1.3 Beta` for which Hu Wenkai owns the copyright. Third-party components remain subject to their respective licenses; see [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md).
+This license applies to the code, documentation, and resources in Win Mouse Fix `0.1.0`, `0.1.1`, `0.1.2 Beta`, `0.1.3 Beta`, and `0.1.4 Beta` for which Hu Wenkai owns the copyright. Third-party components remain subject to their respective licenses; see [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md).
 
 ## 允许的用途 / Permitted Uses
 
@@ -64,9 +64,9 @@ Without written permission, you may not:
 
 ## 版本范围 / Version Scope
 
-本许可只授予 `0.1.0`、`0.1.1`、`0.1.2 Beta` 和 `0.1.3 Beta` 的上述权利。后续版本可以采用不同的免费、收费或商业条款；已经依本许可取得的上述版本权利不因后续版本变化而扩大。
+本许可只授予 `0.1.0`、`0.1.1`、`0.1.2 Beta`、`0.1.3 Beta` 和 `0.1.4 Beta` 的上述权利。后续版本可以采用不同的免费、收费或商业条款；已经依本许可取得的上述版本权利不因后续版本变化而扩大。
 
-This license grants the rights stated above only for versions `0.1.0`, `0.1.1`, `0.1.2 Beta`, and `0.1.3 Beta`. Later versions may use different free, paid, or commercial terms. Rights already obtained for those versions under this license are not expanded by changes to later versions.
+This license grants the rights stated above only for versions `0.1.0`, `0.1.1`, `0.1.2 Beta`, `0.1.3 Beta`, and `0.1.4 Beta`. Later versions may use different free, paid, or commercial terms. Rights already obtained for those versions under this license are not expanded by changes to later versions.
 
 ## 终止 / Termination
 

@@ -11,11 +11,12 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <StackPanel Margin="0,0,0,20">
             <TextBlock Text="按钮选项" Style="{StaticResource PageTitle}" />
-            <TextBlock Text="调整按钮双击的识别方式。" Foreground="{StaticResource MutedTextBrush}" />
+            <TextBlock Text="调整按钮双击和拖动的识别方式。" Foreground="{StaticResource MutedTextBrush}" />
         </StackPanel>
 
         <Border Grid.Row="1" Style="{StaticResource Card}" Margin="0,0,0,18">
@@ -36,7 +37,31 @@
             </Grid>
         </Border>
 
-        <Button Grid.Row="2" Content="完成" HorizontalAlignment="Right" MinWidth="88"
+        <Border Grid.Row="2" Style="{StaticResource Card}" Margin="0,0,0,18">
+            <StackPanel>
+                <Grid Margin="0,0,0,16">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock Text="拖动触发距离" Style="{StaticResource SectionTitle}" />
+                        <TextBlock Text="鼠标移动超过此距离后，才识别为拖动。" Foreground="{StaticResource MutedTextBrush}" />
+                    </StackPanel>
+                    <TextBlock Grid.Column="1" Text="{Binding Timing.DragThresholdPx, StringFormat={}{0} px}"
+                               FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource PrimaryBrush}"
+                               VerticalAlignment="Center" />
+                </Grid>
+                <Slider Minimum="5" Maximum="200" TickFrequency="1" IsSnapToTickEnabled="True"
+                        Value="{Binding Timing.DragThresholdPx, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                <Grid Margin="0,6,0,0">
+                    <TextBlock Text="5 px" Foreground="{StaticResource MutedTextBrush}" FontSize="11" />
+                    <TextBlock Text="200 px" Foreground="{StaticResource MutedTextBrush}" FontSize="11" HorizontalAlignment="Right" />
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <Button Grid.Row="3" Content="完成" HorizontalAlignment="Right" MinWidth="88"
                 Style="{StaticResource PrimaryButton}" Click="Close_Click" />
     </Grid>
 </Window>

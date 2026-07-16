@@ -1,5 +1,6 @@
 using Microsoft.Win32;
 using System.Diagnostics;
+using WinMouseFix.Runtime;
 
 namespace WinMouseFix.Gui.Services;
 
@@ -10,7 +11,8 @@ public sealed class StartupService
 
     public (bool Applied, string Message) SetRunAtLogin(bool enabled)
     {
-        var executablePath = Process.GetCurrentProcess().MainModule?.FileName;
+        var executablePath = RuntimeLauncher.FindExecutable("WinMouseFix.Tray.exe") ??
+                             Process.GetCurrentProcess().MainModule?.FileName;
         if (string.IsNullOrWhiteSpace(executablePath))
         {
             return (false, "无法确定 Win Mouse Fix 程序路径");

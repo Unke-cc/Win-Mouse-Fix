@@ -59,6 +59,15 @@ if (-not (Test-Path -LiteralPath $defaultConfig -PathType Leaf)) {
     Add-CodeError "Missing default configuration: config/default.json"
 }
 
+foreach ($trayIconName in @("WinMouseFix-Tray.ico", "WinMouseFix-Tray-White.ico")) {
+    $trayIconPath = Join-Path $repositoryRoot "assets\$trayIconName"
+    if (-not (Test-Path -LiteralPath $trayIconPath -PathType Leaf)) {
+        Add-CodeError "Missing tray icon: assets/$trayIconName"
+    } else {
+        Add-Note "Tray icon exists: assets/$trayIconName"
+    }
+}
+
 $ignoredDirectoryPattern = "[\\/](bin|obj|dist|\.git)[\\/]"
 $jsonFiles = @(
     Get-ChildItem -LiteralPath $repositoryRoot -Filter "*.json" -File -Recurse |
@@ -111,7 +120,7 @@ if (Test-Path -LiteralPath $defaultConfig -PathType Leaf) {
                 "$($_.button)|$($_.trigger)|$($_.action.type)"
             })
             $missingRemaps = @($expectedRemaps | Where-Object { $actualRemaps -notcontains $_ })
-            $modifierValues = @("none", "ctrl", "alt", "shift", "win")
+            $modifierValues = @("none", "ctrl", "alt", "shift", "win", "mbutton", "xbutton1", "xbutton2")
             $scrollModifiers = @(
                 $config.scroll.horizontalModifier,
                 $config.scroll.fastModifier,
@@ -169,6 +178,7 @@ if (Test-Path -LiteralPath $messageContract -PathType Leaf) {
 }
 
 $guiProject = Find-GuiProject -RepositoryRoot $repositoryRoot
+$trayProject = Get-ChildItem -LiteralPath (Join-Path $repositoryRoot "src\tray") -Filter "*.csproj" -File -ErrorAction SilentlyContinue | Select-Object -First 1
 if ($null -eq $guiProject) {
     Add-CodeError "Expected one .NET project under src/gui, preferably src/gui/WinMouseFix.Gui.csproj."
 } else {
@@ -179,6 +189,19 @@ if ($null -eq $guiProject) {
         Add-CodeError "GUI project must target .NET Framework 4.8 (net48), but targets '$guiTargetFramework'."
     } else {
         Add-Note "GUI project targets .NET Framework 4.8."
+    }
+}
+
+if ($null -eq $trayProject) {
+    Add-CodeError "Expected one .NET project under src/tray."
+} else {
+    $relativeTrayProjectPath = Get-RelativePath -BasePath $repositoryRoot -Path $trayProject.FullName
+    Add-Note ".NET tray project exists: $relativeTrayProjectPath"
+    $trayTargetFramework = Get-DotNetProjectTargetFramework -Project $trayProject
+    if ($trayTargetFramework -ne "net48") {
+        Add-CodeError "Tray project must target .NET Framework 4.8 (net48), but targets '$trayTargetFramework'."
+    } else {
+        Add-Note "Tray project targets .NET Framework 4.8."
     }
 }
 
@@ -215,6 +238,17 @@ if ($null -eq $dotnetPath) {
                 Add-CodeError "GUI auxiliary-window check failed with exit code $($guiValidation.ExitCode)."
             } else {
                 Add-Note "GUI auxiliary windows load successfully."
+            }
+        }
+
+        if ($null -ne $trayProject) {
+            Write-Host "[RUN]   dotnet build $relativeTrayProjectPath" -ForegroundColor Cyan
+            & $dotnetPath build $trayProject.FullName --configuration Debug --nologo
+            $trayBuildExitCode = $LASTEXITCODE
+            if ($trayBuildExitCode -ne 0) {
+                Add-CodeError "Tray project build failed with exit code $trayBuildExitCode."
+            } else {
+                Add-Note "Tray project builds successfully."
             }
         }
 

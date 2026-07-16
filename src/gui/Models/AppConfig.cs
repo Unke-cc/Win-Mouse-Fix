@@ -15,6 +15,7 @@ public sealed class AppConfig : BindableBase
     private string desktopSwipeDirection = "followMouse";
     private ObservableCollection<RemapConfig> remaps = CreateFiveOrMoreRemaps();
     private ScrollConfig scroll = new();
+    private TimingConfig timing = new();
     private ObservableCollection<ExcludedApp> excludedApps = [];
     private StartupConfig startup = new();
 
@@ -66,6 +67,12 @@ public sealed class AppConfig : BindableBase
         set => SetProperty(ref scroll, value ?? new ScrollConfig());
     }
 
+    public TimingConfig Timing
+    {
+        get => timing;
+        set => SetProperty(ref timing, value ?? new TimingConfig());
+    }
+
     public ObservableCollection<ExcludedApp> ExcludedApps
     {
         get => excludedApps;
@@ -102,6 +109,8 @@ public sealed class AppConfig : BindableBase
 
         Scroll ??= new ScrollConfig();
         Scroll.Normalize();
+        Timing ??= new TimingConfig();
+        Timing.Normalize();
         ExcludedApps ??= [];
         for (var index = ExcludedApps.Count - 1; index >= 0; index--)
         {
@@ -414,13 +423,26 @@ public sealed class ScrollConfig : BindableBase
             .ToArray();
         var tokens = new HashSet<string>(rawTokens, StringComparer.Ordinal);
         if (tokens.Count == 0 || tokens.Count != rawTokens.Length || rawTokens.Any(string.IsNullOrWhiteSpace) ||
-            tokens.Any(token => token is not ("ctrl" or "alt" or "shift" or "win")))
+            tokens.Any(token => token is not ("ctrl" or "alt" or "shift" or "win" or "mbutton" or "xbutton1" or "xbutton2")))
         {
             return fallback;
         }
 
-        return string.Join("+", new[] { "ctrl", "alt", "shift", "win" }.Where(tokens.Contains));
+        return string.Join("+", new[] { "ctrl", "alt", "shift", "win", "mbutton", "xbutton1", "xbutton2" }.Where(tokens.Contains));
     }
+}
+
+public sealed class TimingConfig : BindableBase
+{
+    private int dragThresholdPx = 12;
+
+    public int DragThresholdPx
+    {
+        get => dragThresholdPx;
+        set => SetProperty(ref dragThresholdPx, Math.Max(5, Math.Min(200, value)));
+    }
+
+    public void Normalize() => DragThresholdPx = DragThresholdPx;
 }
 
 public sealed class ExcludedApp

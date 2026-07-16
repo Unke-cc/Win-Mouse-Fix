@@ -39,7 +39,9 @@ public sealed class TriggerActionOptionsConverter : IValueConverter
         new("TabNavigation", "标签页切换"),
         new("BrowserNavigation", "页面前进后退"),
         new("DesktopSwitch", "虚拟桌面切换"),
-        new("DesktopStartMenu", "桌面与开始菜单")
+        new("DesktopStartMenu", "桌面与开始菜单"),
+        new("FastScroll", "快速滚动"),
+        new("PrecisionScroll", "精确滚动")
     ];
 
     private static readonly ActionOption[] HoldDrag =

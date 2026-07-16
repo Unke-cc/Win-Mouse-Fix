@@ -1,21 +1,28 @@
 using System.IO;
 using System.Threading;
 using System.Windows;
+using System.Windows.Threading;
 using WinMouseFix.Gui.Models;
+using WinMouseFix.Gui.Services;
+using WinMouseFix.Runtime;
 
 namespace WinMouseFix.Gui;
 
 public partial class App : System.Windows.Application
 {
-    private const string InstanceMutexName = @"Local\WinMouseFix.Gui.Instance";
-    private const string ActivationEventName = @"Local\WinMouseFix.Gui.Activate";
-    private const string ShutdownEventName = @"Local\WinMouseFix.Gui.Shutdown";
     private Mutex? instanceMutex;
     private EventWaitHandle? activationEvent;
+    private EventWaitHandle? lightweightEvent;
     private EventWaitHandle? shutdownEvent;
     private RegisteredWaitHandle? activationRegistration;
+    private RegisteredWaitHandle? lightweightRegistration;
     private RegisteredWaitHandle? shutdownRegistration;
     private bool ownsInstanceMutex;
+    private readonly CoreProcessService coreProcessService = new();
+    private readonly ProfileService profileService = new();
+    private DispatcherTimer? lightweightModeTimer;
+    private MainWindow? mainWindow;
+    private bool exiting;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -32,8 +39,6 @@ public partial class App : System.Windows.Application
                 {
                     throw new InvalidOperationException("Update version parsing failed.");
                 }
-
-                using var trayIcon = WinMouseFix.Gui.MainWindow.LoadTrayIcon();
 
                 var optionsWindow = new ButtonOptionsWindow(new AppConfig());
                 optionsWindow.Close();
@@ -55,14 +60,16 @@ public partial class App : System.Windows.Application
 
         var startInBackground = e.Args.Contains("--background", StringComparer.OrdinalIgnoreCase);
         var shutdownRequested = e.Args.Contains("--shutdown", StringComparer.OrdinalIgnoreCase);
-        activationEvent = new EventWaitHandle(false, EventResetMode.AutoReset, ActivationEventName);
-        shutdownEvent = new EventWaitHandle(false, EventResetMode.AutoReset, ShutdownEventName);
-        instanceMutex = new Mutex(true, InstanceMutexName, out ownsInstanceMutex);
+        activationEvent = new EventWaitHandle(false, EventResetMode.AutoReset, RuntimeNames.SettingsActivateEvent);
+        lightweightEvent = new EventWaitHandle(false, EventResetMode.AutoReset, RuntimeNames.SettingsLightweightEvent);
+        shutdownEvent = new EventWaitHandle(false, EventResetMode.AutoReset, RuntimeNames.SettingsShutdownEvent);
+        instanceMutex = new Mutex(true, RuntimeNames.SettingsMutex, out ownsInstanceMutex);
         if (!ownsInstanceMutex)
         {
             if (shutdownRequested)
             {
                 shutdownEvent.Set();
+                RuntimeLauncher.Signal(RuntimeNames.TrayShutdownEvent);
             }
             else if (!startInBackground)
             {
@@ -75,20 +82,19 @@ public partial class App : System.Windows.Application
 
         if (shutdownRequested)
         {
+            RuntimeLauncher.Signal(RuntimeNames.TrayShutdownEvent);
             Shutdown(0);
             return;
         }
 
         ShutdownMode = System.Windows.ShutdownMode.OnExplicitShutdown;
-        var mainWindow = new MainWindow();
-        MainWindow = mainWindow;
-        mainWindow.StartHidden = startInBackground;
-        if (startInBackground)
-        {
-            mainWindow.Opacity = 0;
-            mainWindow.ShowActivated = false;
-            mainWindow.ShowInTaskbar = false;
-        }
+        RuntimeLauncher.EnsureTrayHost();
+        coreProcessService.StatusChanged += CoreProcessService_StatusChanged;
+
+        lightweightModeTimer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(5) };
+        lightweightModeTimer.Tick += LightweightModeTimer_Tick;
+
+        CreateMainWindow(startInBackground);
 
         activationRegistration = ThreadPool.RegisterWaitForSingleObject(
             activationEvent,
@@ -96,7 +102,19 @@ public partial class App : System.Windows.Application
             {
                 if (!Dispatcher.HasShutdownStarted)
                 {
-                    Dispatcher.BeginInvoke(mainWindow.ShowSettingsWindow);
+                    Dispatcher.BeginInvoke(OpenSettingsWindow);
+                }
+            },
+            null,
+            Timeout.Infinite,
+            executeOnlyOnce: false);
+        lightweightRegistration = ThreadPool.RegisterWaitForSingleObject(
+            lightweightEvent,
+            (_, _) =>
+            {
+                if (!Dispatcher.HasShutdownStarted)
+                {
+                    Dispatcher.BeginInvoke(() => _ = EnterLightweightModeAsync());
                 }
             },
             null,
@@ -108,20 +126,144 @@ public partial class App : System.Windows.Application
             {
                 if (!Dispatcher.HasShutdownStarted)
                 {
-                    Dispatcher.BeginInvoke(mainWindow.RequestApplicationShutdown);
+                    Dispatcher.BeginInvoke(() => _ = ExitApplicationAsync());
                 }
             },
             null,
             Timeout.Infinite,
             executeOnlyOnce: false);
+    }
+
+    private void CreateMainWindow(bool startHidden)
+    {
+        mainWindow = new MainWindow(coreProcessService, profileService)
+        {
+            StartHidden = startHidden
+        };
+        MainWindow = mainWindow;
+        mainWindow.WindowHiddenToTray += MainWindow_WindowHiddenToTray;
+        mainWindow.ActivityDetected += MainWindow_ActivityDetected;
+        if (startHidden)
+        {
+            mainWindow.Opacity = 0;
+            mainWindow.ShowActivated = false;
+            mainWindow.ShowInTaskbar = false;
+        }
+
         mainWindow.Show();
+        ResetLightweightModeTimer();
+    }
+
+    private void MainWindow_WindowHiddenToTray(object? sender, EventArgs e)
+    {
+        if (exiting || lightweightModeTimer is null)
+        {
+            return;
+        }
+
+        ResetLightweightModeTimer();
+    }
+
+    private void MainWindow_ActivityDetected(object? sender, EventArgs e)
+    {
+        if (!exiting && mainWindow?.IsVisible == true)
+        {
+            ResetLightweightModeTimer();
+        }
+    }
+
+    private void ResetLightweightModeTimer()
+    {
+        if (exiting || lightweightModeTimer is null)
+        {
+            return;
+        }
+
+        lightweightModeTimer.Stop();
+        lightweightModeTimer.Start();
+    }
+
+    private void OpenSettingsWindow()
+    {
+        if (mainWindow is null)
+        {
+            CreateMainWindow(startHidden: false);
+        }
+        else
+        {
+            mainWindow.ShowSettingsWindow();
+        }
+
+        ResetLightweightModeTimer();
+    }
+
+    private async void LightweightModeTimer_Tick(object? sender, EventArgs e)
+    {
+        lightweightModeTimer?.Stop();
+        await EnterLightweightModeAsync();
+    }
+
+    private async Task EnterLightweightModeAsync()
+    {
+        var window = mainWindow;
+        if (window is null)
+        {
+            return;
+        }
+
+        if (!await window.EnterLightweightModeAsync())
+        {
+            return;
+        }
+
+        window.WindowHiddenToTray -= MainWindow_WindowHiddenToTray;
+        window.ActivityDetected -= MainWindow_ActivityDetected;
+        mainWindow = null;
+        MainWindow = null;
+        Shutdown(0);
+    }
+
+    private void CoreProcessService_StatusChanged(object? sender, EventArgs e)
+    {
+        if (!Dispatcher.HasShutdownStarted)
+        {
+            Dispatcher.BeginInvoke(() =>
+            {
+                mainWindow?.SyncRunningState();
+            });
+        }
+    }
+
+    private async Task ExitApplicationAsync()
+    {
+        if (exiting)
+        {
+            return;
+        }
+
+        exiting = true;
+        lightweightModeTimer?.Stop();
+        if (mainWindow is not null)
+        {
+            await mainWindow.PrepareForApplicationShutdownAsync();
+            mainWindow.WindowHiddenToTray -= MainWindow_WindowHiddenToTray;
+            mainWindow.ActivityDetected -= MainWindow_ActivityDetected;
+            mainWindow = null;
+            MainWindow = null;
+        }
+
+        Shutdown(0);
     }
 
     protected override void OnExit(ExitEventArgs e)
     {
+        lightweightModeTimer?.Stop();
         activationRegistration?.Unregister(null);
+        lightweightRegistration?.Unregister(null);
         shutdownRegistration?.Unregister(null);
+        coreProcessService.StatusChanged -= CoreProcessService_StatusChanged;
         activationEvent?.Dispose();
+        lightweightEvent?.Dispose();
         shutdownEvent?.Dispose();
         if (ownsInstanceMutex)
         {
