@@ -27,7 +27,7 @@ This document is provided in Chinese and English. If the two versions differ, th
 .\scripts\package.ps1
 ```
 
-Pull Request 应说明改动目的、验证结果和仍需人工检查的内容。界面变化应附截图；行为变化应更新 `tests/manual/mvp-checklist.md`。
+Pull Request 应说明改动目的、验证结果和仍需人工检查的内容。界面变化应附截图；行为变化应更新 `tests/manual/mvp-checklist.md` 或对应版本的 Beta 检查清单。
 
 ### CLA
 
@@ -60,7 +60,7 @@ For installer-related changes, also run:
 .\scripts\package.ps1
 ```
 
-Each Pull Request must describe its purpose, verification results, and any remaining manual checks. Include screenshots for interface changes and update `tests/manual/mvp-checklist.md` for behavior changes.
+Each Pull Request must describe its purpose, verification results, and any remaining manual checks. Include screenshots for interface changes and update the release-candidate or version-specific Beta checklist for behavior changes.
 
 ### CLA
 

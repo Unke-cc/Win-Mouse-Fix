@@ -1,9 +1,7 @@
-# AutoHotkey v2 Mouse Engine
+# Win Mouse Fix 鼠标功能核心
 
-`MouseEngine.ahk` is the executable entry point for the Win Mouse Fix mouse engine.
-It loads `%AppData%\WinMouseFix\config.json` when present and otherwise reads
-the packaged `config/default.json`, then the repository `config/default.json`
-during development. If none is available, safe built-in defaults are used.
+`MouseEngine.ahk` 是 Win Mouse Fix 鼠标功能核心的入口文件，当前配置格式为 `configVersion: 2`。
+它优先读取 `%AppData%\WinMouseFix\config.json`；没有用户配置时读取安装包中的 `config/default.json`，开发环境则读取仓库中的默认配置。
 
 Run a configuration and module check without registering mouse input:
 
@@ -12,7 +10,7 @@ Run a configuration and module check without registering mouse input:
   ".\src\engine\MouseEngine.ahk" --validate
 ```
 
-While running, the engine checks the selected configuration file every 250 ms.
+运行时核心每 250 毫秒检查一次当前配置文件。
 The WPF application owns the visible tray menu. It can request engine operations
 by posting these messages to the engine window:
 
@@ -20,16 +18,13 @@ by posting these messages to the engine window:
 - `0x8002`: pause mappings
 - `0x8003`: resume mappings
 
-Physical inputs in `remaps` are limited to `MButton`, `XButton1`, and `XButton2`.
-Mappings support click, double-click, hold, held-wheel, and held-drag.
+`remaps` 当前支持 `MButton`、`XButton1` 和 `XButton2`。
+映射支持点击、双击、长按、按住并滚动和按住并拖动。
+按住并滚动使用一个融合动作处理上下方向；按住并拖动使用一个融合动作处理上下左右。
 The double-click choices are fast (150 ms), medium (250 ms), and slow (400 ms).
-`desktopSwipeDirection` controls horizontal desktop navigation. `followMouse`
-makes the desktop page animation follow the drag (`left` sends `Ctrl+Win+Right`),
-while `oppositeMouse` sends the matching arrow direction.
-Application exclusion and full-screen pause are checked
-before every input sequence. When `scroll.smooth` is enabled, additional wheel
-steps caused by a speed above `1.0` are spread over a short interval. All output
-uses AutoHotkey's own send path so it cannot re-enter the wheel handler.
+应用排除和全屏暂停会在每次输入前检查。
+滚轮修饰键支持由 Ctrl、Alt、Shift、Win 组成的组合；快速滚动和精确滚动发送不带对应修饰键的普通滚轮，缩放保留 Ctrl 组合。
+触摸板连续高频滚轮输入使用保护策略，达到阈值后暂时停止软件滚轮接管，让系统恢复原生滚动。
+`scroll.smooth` 开启后，额外滚轮步进会以短间隔发送。
 
-The GUI can suspend mappings while its input area is active by posting `0x8002`,
-then post `0x8003` when capture ends. No separate capture protocol is required.
+GUI 可通过 `0x8002` 暂停映射，在录入区域结束后通过 `0x8003` 恢复映射；当前不使用独立的状态确认协议。

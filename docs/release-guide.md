@@ -1,6 +1,6 @@
 # 发布与安装
 
-本文说明 Win Mouse Fix MVP 安装程序的生成、安装、更新、卸载和发布检查。当前安装包版本为 `0.1.3 Beta`，目标系统为 Windows 11 x64，并兼容 Windows 10 22H2 x64。
+本文说明 Win Mouse Fix `0.1.3 Beta` 安装程序的生成、安装、更新、卸载和发布检查。目标系统为 Windows 11 x64，并兼容 Windows 10 22H2 x64。
 
 ## 生成安装程序
 
@@ -15,6 +15,10 @@
 
 - `dist/app/`：便携运行目录。
 - `dist/WinMouseFix-Setup-0.1.3-beta.exe`：当前用户安装程序。
+
+发布时应同时记录安装包大小和 SHA256；当前构建结果以打包脚本输出和最终安装包文件为准。
+
+当前 `0.1.3 Beta` 构建记录：3,162,076 bytes（约 3.016 MiB），SHA256 为 `55625D25D1EBA4AD349A1A9FAE1B444E65DA6CD2952369F0A692B39A3E6E9543`。
 
 `package.ps1` 会先重新生成 `dist/app`。构建期间会检查 GUI 主程序及其依赖不超过 10 MiB；鼠标核心和 `config/` 不计入该数值。界面图标已嵌入 GUI，不在发布目录重复保存。
 
@@ -44,7 +48,7 @@ GitHub 和 Gitee 应使用相同的 `v0.1.3-beta` tag，并上传同一份安装
 
 ## 发布检查
 
-发布前完整执行 [MVP 手动检查清单](../tests/manual/mvp-checklist.md) 和 [0.1.3 Beta 更新检查清单](../tests/manual/v0.1.3-beta-update-checklist.md)，至少确认：
+发布前完整执行 [发布候选检查清单](../tests/manual/mvp-checklist.md) 和 [0.1.3 Beta 更新检查清单](../tests/manual/v0.1.3-beta-update-checklist.md)，至少确认：
 
 1. Windows 10 22H2 x64 和 Windows 11 x64 均可安装和启动。
 2. 普通重复启动只显示已有窗口，`--background` 只进入托盘。
@@ -52,3 +56,5 @@ GitHub 和 Gitee 应使用相同的 `v0.1.3-beta` tag，并上传同一份安装
 4. 卸载后登录运行登记已删除，用户设置仍然保留。
 5. `validate.ps1`、`package.ps1` 均返回 `0`。
 6. “关于”页能显示作者与许可状态，并能正确处理无 Release、已是最新版和发现新版三种结果。
+7. 滚动组合键、普通键拒绝、Alt/Win 普通滚轮、触摸板连续滑动均完成手动验证。
+8. 发布记录包含安装包文件名、大小、SHA256、GitHub Release 地址和 Gitee Release 地址。

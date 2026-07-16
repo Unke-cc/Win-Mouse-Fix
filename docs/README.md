@@ -4,21 +4,20 @@
 
 ## 阅读顺序
 
-1. [应用设计文档](./application-design.md)：了解产品目标、功能范围、用户操作流程、页面设计、程序组成、配置方式、发布方式和验收标准。
-2. [MacMouseFix 3.0.8 功能盘点](./macmousefix-feature-inventory.md)：查看参考应用的页面、鼠标功能、系统功能、Windows 对应方式和版本建议。
-3. [技术选择](./technology-selection.md)：查看 GUI、AutoHotkey v2 核心、通信方式、配置职责、打包工具和最小验证清单。
-4. [发布与安装](./release-guide.md)：查看安装程序生成、安装、更新、卸载和发布检查。
-5. [0.1.3 Beta 更新检查清单](../tests/manual/v0.1.3-beta-update-checklist.md)：检查滚动组合键、触摸板保护、完整动作列表、双源更新和配置管理。
-6. [项目许可](../LICENSE.md)：查看 `0.1.0`、`0.1.1`、`0.1.2 Beta` 和 `0.1.3 Beta` 的中英双语个人非商业使用范围和限制。
-7. [贡献指南](../CONTRIBUTING.md)：查看中英双语提交要求、验证命令和 CLA 接受方式。
+1. [应用设计文档](./application-design.md)：查看 `0.1.3 Beta` 的当前功能、配置、页面和验证标准。
+2. [技术选择](./technology-selection.md)：查看当前程序组成、配置生效、打包方式和仍未实现的方向。
+3. [发布与安装](./release-guide.md)：查看安装程序生成、安装、更新、卸载和发布检查。
+4. [0.1.3 Beta 更新检查清单](../tests/manual/v0.1.3-beta-update-checklist.md)：检查滚动组合键、触摸板保护、完整动作列表、双源更新和配置管理。
+5. [项目许可](../LICENSE.md)：查看 `0.1.0`、`0.1.1`、`0.1.2 Beta` 和 `0.1.3 Beta` 的中英双语个人非商业使用范围和限制。
+6. [贡献指南](../CONTRIBUTING.md)：查看中英双语提交要求、验证命令和 CLA 接受方式。
 
 ## 文档分类
 
 | 分类 | 用途 | 当前文档 |
 | --- | --- | --- |
-| 产品与设计 | 说明要解决的问题、功能边界及用户体验 | [应用设计文档](./application-design.md)、[功能盘点](./macmousefix-feature-inventory.md) |
+| 产品与设计 | 说明当前功能边界及用户体验 | [应用设计文档](./application-design.md) |
 | 开发 | 说明技术选择、程序关系、本地运行和代码约定 | [技术选择](./technology-selection.md) |
-| 测试 | 记录可重复执行的功能检查步骤 | [MVP 手动检查清单](../tests/manual/mvp-checklist.md)、[0.1.3 Beta 更新检查清单](../tests/manual/v0.1.3-beta-update-checklist.md) |
+| 测试 | 记录可重复执行的功能检查步骤 | [发布候选检查清单](../tests/manual/mvp-checklist.md)、[0.1.3 Beta 更新检查清单](../tests/manual/v0.1.3-beta-update-checklist.md) |
 | 发布 | 说明打包、安装、更新、卸载和版本检查 | [发布与安装](./release-guide.md) |
 | 用户帮助 | 面向普通用户说明安装和使用方法 | 暂无 |
 | 许可与贡献 | 规定使用范围、商业授权、第三方声明和贡献授权 | [项目许可](../LICENSE.md)、[商业许可](../COMMERCIAL-LICENSE.md)、[第三方组件声明](../THIRD_PARTY_NOTICES.md)、[贡献指南](../CONTRIBUTING.md)、[CLA](../CLA.md) |
@@ -30,5 +29,6 @@
 - 功能、界面或配置发生变化时，同一次提交中更新对应文档。
 - 文档中的命令、路径和配置示例必须能够实际执行或读取。
 - 尚未确定的内容明确标记为“待定”，不得写成已经完成的功能。
+- `macmousefix-feature-inventory.md` 仅为历史参考资料，不代表 Win Mouse Fix `0.1.3 Beta` 的当前功能。
 
 仓库根目录的 `AGENTS.md` 是贡献者工作规则，需要保留在根目录以便工具自动读取，因此不属于本手册正文。
