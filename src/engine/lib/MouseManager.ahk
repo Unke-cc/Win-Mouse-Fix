@@ -12,6 +12,9 @@ class MouseManager {
         this.scrollMode := "regular"
         this.smoothQueue := []
         this.smoothTimer := ObjBindMethod(this, "ProcessSmoothWheel")
+        this.inertiaVelocity := 0.0
+        this.inertiaCarry := 0.0
+        this.inertiaTimer := ObjBindMethod(this, "ProcessInertiaWheel")
         this.motionTimer := ObjBindMethod(this, "CheckMotionAndContext")
         this.lastCanHandle := appRuleManager.ShouldHandle()
         this.SetConfig(config)
@@ -34,6 +37,7 @@ class MouseManager {
         this.scrollMode := "regular"
         this.smoothQueue := []
         SetTimer(this.smoothTimer, 0)
+        this.ClearInertia()
         if wasStarted {
             this.RegisterHotkeys()
         }
@@ -124,6 +128,7 @@ class MouseManager {
         SetTimer(this.motionTimer, 0)
         SetTimer(this.smoothTimer, 0)
         this.smoothQueue := []
+        this.ClearInertia()
         for buttonName in this.registeredButtons {
             try Hotkey("$*" buttonName, "Off")
             try Hotkey("$*" buttonName " Up", "Off")
@@ -331,7 +336,7 @@ class MouseManager {
                 return
             }
             if state["interaction"] = "hold" || state["interaction"] = "drag" {
-                this.SendRegularWheel(direction)
+                this.SendRegularWheel(direction, 1.0, "regular", false)
                 return
             }
             action := this.GetWheelAction(activeButton, direction)
@@ -487,7 +492,7 @@ class MouseManager {
         return this.scrollConfig["reverse"] ? (direction = "up" ? "down" : "up") : direction
     }
 
-    SendRegularWheel(direction, speedScale := 1.0, scrollMode := "regular") {
+    SendRegularWheel(direction, speedScale := 1.0, scrollMode := "regular", allowInertia := true) {
         if !this.appRuleManager.ShouldHandle() {
             this.actionManager.SendWheel(direction)
             return
@@ -495,6 +500,10 @@ class MouseManager {
         this.BeginScrollMode(scrollMode)
         direction := this.ApplyScrollDirection(direction)
         preserveModifiers := scrollMode != "fast" && scrollMode != "precision"
+        if allowInertia && scrollMode = "regular" && speedScale = 1.0 && this.scrollConfig["inertia"] {
+            this.QueueInertiaWheel(direction)
+            return
+        }
         if this.scrollConfig["smooth"] {
             this.QueueSmoothWheel(direction, speedScale, preserveModifiers)
             return
@@ -508,6 +517,40 @@ class MouseManager {
         this.actionManager.SendWheel(direction, sendCount, preserveModifiers)
     }
 
+    QueueInertiaWheel(direction) {
+        ; Inertia is intentionally fixed to a short, bounded tail for predictable input latency.
+        impulse := this.scrollConfig["speed"]
+        this.inertiaVelocity += direction = "up" ? impulse : -impulse
+        this.inertiaVelocity := Max(-18.0, Min(18.0, this.inertiaVelocity))
+        SetTimer(this.inertiaTimer, 16)
+    }
+
+    ProcessInertiaWheel(*) {
+        if !this.started || !this.appRuleManager.ShouldHandle() || !this.scrollConfig["takeOverWheel"] {
+            this.ClearInertia()
+            return
+        }
+        if Abs(this.inertiaVelocity) < 0.12 {
+            this.ClearInertia()
+            return
+        }
+        magnitude := Abs(this.inertiaVelocity) + this.inertiaCarry
+        sendCount := Floor(magnitude)
+        this.inertiaCarry := magnitude - sendCount
+        if sendCount > 0 {
+            this.actionManager.SendWheel(this.inertiaVelocity > 0 ? "up" : "down", sendCount)
+        }
+        this.inertiaVelocity *= 0.82
+    }
+
+    ClearInertia() {
+        this.inertiaVelocity := 0.0
+        this.inertiaCarry := 0.0
+        if this.HasOwnProp("inertiaTimer") {
+            SetTimer(this.inertiaTimer, 0)
+        }
+    }
+
     BeginScrollMode(scrollMode) {
         if this.scrollMode = scrollMode {
             return
@@ -516,6 +559,7 @@ class MouseManager {
         this.scrollCarry := 0.0
         this.smoothQueue := []
         SetTimer(this.smoothTimer, 0)
+        this.ClearInertia()
     }
 
     QueueSmoothWheel(direction, speedScale := 1.0, preserveModifiers := true) {

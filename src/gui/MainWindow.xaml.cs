@@ -10,6 +10,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
+using WinMouseFix.Gui.Controls;
 using WinMouseFix.Gui.Models;
 using WinMouseFix.Gui.Services;
 
@@ -51,6 +52,9 @@ public partial class MainWindow : Window
     private bool centerWindowAfterInitialResize = true;
     private UpdateSource? aboutSource;
     private bool aboutSourceResolved;
+    private UpdateCheckResult? pendingUpdate;
+    private DownloadedUpdate? downloadedUpdate;
+    private CancellationTokenSource? updateDownloadCancellation;
 
     internal event EventHandler? WindowHiddenToTray;
     internal event EventHandler? ActivityDetected;
@@ -110,6 +114,7 @@ public partial class MainWindow : Window
         AboutVersionText.Text = $"版本 {GetCurrentReleaseVersion()}";
         loading = false;
         SyncScrollModifiersFromRemaps();
+        RefreshModifierDisplays();
         await SaveConfigurationAsync(showConfirmation: false);
         if (loadError is not null)
         {
@@ -123,6 +128,7 @@ public partial class MainWindow : Window
         GeneralNavigation.IsChecked = true;
         UpdateApplicationEmptyState();
         UpdateRemapEmptyState();
+        RefreshModifierDisplays();
         UpdateCoreStatus();
         coreStatusTimer.Start();
 
@@ -213,6 +219,7 @@ public partial class MainWindow : Window
         {
             RejectDuplicateModifier(e.PropertyName!);
             WarnMouseModifierConflict(e.PropertyName!);
+            RefreshModifierDisplays();
         }
 
         if (!loading && sender is ActionConfig action && e.PropertyName == nameof(ActionConfig.Type))
@@ -242,6 +249,7 @@ public partial class MainWindow : Window
         }
 
         UpdateRemapEmptyState();
+        RefreshModifierDisplays();
         ScheduleSave();
         if (activePage == ButtonsPage)
         {
@@ -975,32 +983,52 @@ public partial class MainWindow : Window
 
     private void SyncScrollModifierFromAction(ActionConfig action)
     {
-        var remap = config.Remaps.FirstOrDefault(item => ReferenceEquals(item.Action, action));
-        if (remap is null)
+        RefreshModifierDisplays();
+    }
+
+    private void RefreshModifierDisplays()
+    {
+        if (!IsLoaded)
         {
             return;
         }
 
-        var modifier = remap.Button switch
+        FastModifierBox.Text = BuildModifierDisplay(config.Scroll.FastModifier, "FastScroll");
+        PrecisionModifierBox.Text = BuildModifierDisplay(config.Scroll.PrecisionModifier, "PrecisionScroll");
+    }
+
+    private string BuildModifierDisplay(string configuredModifier, string actionType)
+    {
+        var modifiers = new List<string>();
+        AddModifier(configuredModifier);
+        foreach (var button in config.Remaps
+                     .Where(item => item.Action.Type == actionType)
+                     .Select(item => item.Button))
         {
-            "MButton" => "mbutton",
-            "XButton1" => "xbutton1",
-            "XButton2" => "xbutton2",
-            _ => null
-        };
-        if (modifier is null)
-        {
-            return;
+            AddModifier(button switch
+            {
+                "MButton" => "mbutton",
+                "XButton1" => "xbutton1",
+                "XButton2" => "xbutton2",
+                _ => "none"
+            });
         }
 
-        switch (action.Type)
+        return modifiers.Count == 0 ? "关闭" : string.Join("、", modifiers);
+
+        void AddModifier(string value)
         {
-            case "FastScroll":
-                config.Scroll.FastModifier = modifier;
-                break;
-            case "PrecisionScroll":
-                config.Scroll.PrecisionModifier = modifier;
-                break;
+            if (value == "none" || modifiers.Contains(value, StringComparer.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            var formatted = new ModifierShortcutConverter().Convert(
+                value,
+                typeof(string),
+                null,
+                System.Globalization.CultureInfo.InvariantCulture);
+            modifiers.Add((string)formatted);
         }
     }
 
@@ -1268,6 +1296,12 @@ public partial class MainWindow : Window
     {
         CheckForUpdatesButton.IsEnabled = false;
         CheckForUpdatesButton.Content = "正在检查…";
+        pendingUpdate = null;
+        downloadedUpdate = null;
+        DownloadUpdateButton.Visibility = Visibility.Collapsed;
+        CancelUpdateButton.Visibility = Visibility.Collapsed;
+        InstallUpdateButton.Visibility = Visibility.Collapsed;
+        UpdateProgressPanel.Visibility = Visibility.Collapsed;
 
         try
         {
@@ -1275,6 +1309,7 @@ public partial class MainWindow : Window
             var result = await updateService.CheckAsync(currentVersion, config.ReceiveBetaUpdates);
             if (result.Status == UpdateCheckStatus.Error)
             {
+                UpdateBadge.Visibility = Visibility.Collapsed;
                 ApplyUnavailableAboutSource(result.ErrorMessage ?? "GitHub 和 Gitee 暂不可用，请检查网络后重试。");
                 ShowStatus(result.ErrorMessage ?? "暂时无法检查更新");
                 return;
@@ -1288,6 +1323,9 @@ public partial class MainWindow : Window
 
             if (result.Status == UpdateCheckStatus.NoRelease)
             {
+                UpdateBadge.Visibility = Visibility.Collapsed;
+                DownloadUpdateButton.Visibility = Visibility.Collapsed;
+                UpdateProgressPanel.Visibility = Visibility.Collapsed;
                 ShowStatus(config.ReceiveBetaUpdates
                     ? "暂未发布可检查的正式版或 Beta 版"
                     : "暂未发布可检查的正式版本");
@@ -1297,25 +1335,28 @@ public partial class MainWindow : Window
             var sourceName = result.Source == UpdateSource.Gitee ? "Gitee" : "GitHub";
             if (result.Status == UpdateCheckStatus.UpToDate)
             {
+                UpdateBadge.Visibility = Visibility.Collapsed;
+                DownloadUpdateButton.Visibility = Visibility.Collapsed;
+                UpdateProgressPanel.Visibility = Visibility.Collapsed;
                 ShowStatus($"当前已是最新版本 {currentVersion}（{sourceName}）");
                 return;
             }
 
-            var pageUrl = result.PageUrl;
-            if (result.ReleaseVersion is null || string.IsNullOrWhiteSpace(pageUrl))
+            if (result.ReleaseVersion is null)
             {
                 ShowStatus("新版本信息不完整，请稍后重试");
                 return;
             }
 
-            if (System.Windows.MessageBox.Show(this,
-                    $"发现新版本 {result.DisplayName ?? result.ReleaseVersion.ToString()}（{sourceName}），是否打开下载页面？",
-                    "Win Mouse Fix 更新",
-                    MessageBoxButton.YesNo,
-                    MessageBoxImage.Information) == MessageBoxResult.Yes)
-            {
-                OpenWebPage(pageUrl!, "无法打开最新版本页面");
-            }
+            pendingUpdate = result;
+            downloadedUpdate = null;
+            UpdateBadge.Visibility = Visibility.Visible;
+            DownloadUpdateButton.Visibility = result.CanDownload ? Visibility.Visible : Visibility.Collapsed;
+            UpdateProgressPanel.Visibility = Visibility.Visible;
+            UpdateStatusText.Text = result.CanDownload
+                ? $"发现新版本 {result.DisplayName ?? result.ReleaseVersion.ToString()}（{sourceName}），点击“下载更新”"
+                : "发现新版本，但 Release 中没有可用安装包。";
+            ShowStatus(UpdateStatusText.Text);
         }
         catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
         {
@@ -1325,6 +1366,80 @@ public partial class MainWindow : Window
         {
             CheckForUpdatesButton.Content = "检查更新";
             CheckForUpdatesButton.IsEnabled = true;
+        }
+    }
+
+    private async void DownloadUpdate_Click(object sender, RoutedEventArgs e)
+    {
+        if (pendingUpdate is null || !pendingUpdate.CanDownload)
+        {
+            return;
+        }
+
+        updateDownloadCancellation?.Dispose();
+        updateDownloadCancellation = new CancellationTokenSource();
+        DownloadUpdateButton.Visibility = Visibility.Collapsed;
+        CancelUpdateButton.Visibility = Visibility.Visible;
+        InstallUpdateButton.Visibility = Visibility.Collapsed;
+        UpdateProgressBar.Value = 0;
+        UpdateProgressPanel.Visibility = Visibility.Visible;
+        UpdateStatusText.Text = "正在下载更新…";
+        try
+        {
+            var progress = new Progress<DownloadProgress>(value =>
+            {
+                UpdateProgressBar.Value = value.Percentage;
+                UpdateStatusText.Text = value.TotalBytes > 0
+                    ? $"正在下载更新… {value.Percentage:0}%（{value.BytesReceived / 1024d / 1024d:0.0} / {value.TotalBytes / 1024d / 1024d:0.0} MB）"
+                    : $"正在下载更新… {value.BytesReceived / 1024d / 1024d:0.0} MB";
+            });
+            downloadedUpdate = await updateService.DownloadAndVerifyAsync(pendingUpdate, progress, updateDownloadCancellation.Token);
+            UpdateProgressBar.Value = 100;
+            UpdateStatusText.Text = "下载完成，完整性校验通过。可以立即安装。";
+            InstallUpdateButton.Visibility = Visibility.Visible;
+            UpdateBadge.Visibility = Visibility.Collapsed;
+        }
+        catch (OperationCanceledException)
+        {
+            UpdateStatusText.Text = "已取消下载。";
+            DownloadUpdateButton.Visibility = Visibility.Visible;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or InvalidDataException or IOException or InvalidOperationException)
+        {
+            UpdateStatusText.Text = $"下载失败：{ex.Message}";
+            DownloadUpdateButton.Visibility = Visibility.Visible;
+        }
+        finally
+        {
+            CancelUpdateButton.Visibility = Visibility.Collapsed;
+            updateDownloadCancellation?.Dispose();
+            updateDownloadCancellation = null;
+        }
+    }
+
+    private void CancelUpdate_Click(object sender, RoutedEventArgs e)
+    {
+        updateDownloadCancellation?.Cancel();
+    }
+
+    private async void InstallUpdate_Click(object sender, RoutedEventArgs e)
+    {
+        if (downloadedUpdate is null || !File.Exists(downloadedUpdate.InstallerPath))
+        {
+            UpdateStatusText.Text = "安装包不存在，请重新下载。";
+            DownloadUpdateButton.Visibility = Visibility.Visible;
+            InstallUpdateButton.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        try
+        {
+            Process.Start(new ProcessStartInfo(downloadedUpdate.InstallerPath) { UseShellExecute = true });
+            await PrepareForApplicationShutdownAsync();
+        }
+        catch (Exception ex) when (ex is Win32Exception or InvalidOperationException or IOException)
+        {
+            UpdateStatusText.Text = $"无法启动安装程序：{ex.Message}";
         }
     }
 
@@ -1433,6 +1548,7 @@ public partial class MainWindow : Window
         }
 
         exiting = true;
+        updateDownloadCancellation?.Cancel();
         saveTimer.Stop();
         statusTimer.Stop();
         captureClickTimer.Stop();

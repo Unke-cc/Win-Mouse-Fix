@@ -1,4 +1,6 @@
 using System.Net.Http;
+using System.IO;
+using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
@@ -49,6 +51,7 @@ public sealed class UpdateCheckResult
         DisplayName = release?.DisplayName;
         PageUrl = release?.PageUrl;
         ErrorMessage = errorMessage;
+        Artifact = release?.Artifact;
     }
 
     public UpdateCheckStatus Status { get; }
@@ -59,6 +62,8 @@ public sealed class UpdateCheckResult
     public string? DisplayName { get; }
     public string? PageUrl { get; }
     public string? ErrorMessage { get; }
+    public UpdateArtifact? Artifact { get; }
+    public bool CanDownload => Status == UpdateCheckStatus.UpdateAvailable && Artifact is not null;
 
     internal static UpdateCheckResult FromRelease(UpdateRelease release, ReleaseVersion currentVersion) =>
         new(
@@ -308,7 +313,8 @@ public sealed class UpdateService
                 source,
                 version,
                 string.IsNullOrWhiteSpace(displayName) ? tag! : displayName!,
-                pageUrl!);
+                pageUrl!,
+                ParseArtifact(item, source));
             if (latest is null || release.ReleaseVersion.CompareTo(latest.ReleaseVersion) > 0)
             {
                 latest = release;
@@ -321,6 +327,202 @@ public sealed class UpdateService
         }
 
         return latest;
+    }
+
+    public async Task<DownloadedUpdate> DownloadAndVerifyAsync(
+        UpdateCheckResult update,
+        IProgress<DownloadProgress>? progress = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (!update.CanDownload || update.ReleaseVersion is null || update.Artifact is null || !update.Source.HasValue)
+        {
+            throw new InvalidOperationException("当前没有可下载的更新。");
+        }
+
+        try
+        {
+            return await DownloadArtifactAsync(update.Source.Value, update.ReleaseVersion, update.Artifact, progress, cancellationToken);
+        }
+        catch (Exception ex) when (update.Source == UpdateSource.GitHub &&
+                                   !cancellationToken.IsCancellationRequested &&
+                                   (ex is HttpRequestException or InvalidDataException or TaskCanceledException))
+        {
+            var fallback = await FindReleaseByVersionAsync(UpdateSource.Gitee, update.ReleaseVersion, cancellationToken);
+            if (fallback?.Artifact is null)
+            {
+                throw;
+            }
+
+            return await DownloadArtifactAsync(UpdateSource.Gitee, update.ReleaseVersion, fallback.Artifact, progress, cancellationToken);
+        }
+    }
+
+    private async Task<UpdateRelease?> FindReleaseByVersionAsync(UpdateSource source, ReleaseVersion version, CancellationToken cancellationToken)
+    {
+        var address = source == UpdateSource.GitHub ? GitHubReleasesUrl : GiteeReleasesUrl;
+        using var request = new HttpRequestMessage(HttpMethod.Get, address);
+        request.Headers.UserAgent.ParseAdd($"WinMouseFix/update/{version}");
+        using var response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        response.EnsureSuccessStatusCode();
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        foreach (var item in document.RootElement.EnumerateArray())
+        {
+            if (!ReleaseVersion.TryParse(ReadString(item, "tag_name"), out var candidate) || !candidate.Equals(version))
+            {
+                continue;
+            }
+
+            var tag = ReadString(item, "tag_name")!;
+            var pageUrl = source == UpdateSource.Gitee ? BuildGiteeReleasePage(tag) : ReadString(item, "html_url");
+            if (!IsAllowedReleasePage(pageUrl, source))
+            {
+                continue;
+            }
+
+            return new UpdateRelease(source, candidate, ReadString(item, "name") ?? tag, pageUrl!, ParseArtifact(item, source));
+        }
+
+        return null;
+    }
+
+    private async Task<DownloadedUpdate> DownloadArtifactAsync(
+        UpdateSource source,
+        ReleaseVersion version,
+        UpdateArtifact artifact,
+        IProgress<DownloadProgress>? progress,
+        CancellationToken cancellationToken)
+    {
+        if (!IsAllowedDownloadUrl(artifact.DownloadUrl, source))
+        {
+            throw new InvalidDataException("安装包下载地址无效。");
+        }
+
+        var tempDirectory = Path.Combine(Path.GetTempPath(), "WinMouseFix", "updates");
+        Directory.CreateDirectory(tempDirectory);
+        var targetPath = Path.Combine(tempDirectory, $"{Guid.NewGuid():N}-{Path.GetFileName(artifact.FileName)}");
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, artifact.DownloadUrl);
+            request.Headers.UserAgent.ParseAdd("WinMouseFix/update-download");
+            using var response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+            response.EnsureSuccessStatusCode();
+            var total = artifact.Size > 0 ? artifact.Size : response.Content.Headers.ContentLength ?? 0;
+            long received = 0;
+            using (var input = await response.Content.ReadAsStreamAsync())
+            using (var output = new FileStream(targetPath, FileMode.CreateNew, FileAccess.Write, FileShare.None, 81920, useAsync: true))
+            {
+                var buffer = new byte[81920];
+                int read;
+                while ((read = await input.ReadAsync(buffer, 0, buffer.Length, cancellationToken)) > 0)
+                {
+                    await output.WriteAsync(buffer, 0, read, cancellationToken);
+                    received += read;
+                    progress?.Report(new DownloadProgress(received, total));
+                }
+            }
+
+            if (artifact.Size > 0 && received != artifact.Size)
+            {
+                throw new InvalidDataException("安装包大小校验失败。");
+            }
+
+            var expectedHash = await ReadExpectedHashAsync(artifact.Sha256Url, source, cancellationToken);
+            using var stream = File.OpenRead(targetPath);
+            var actualHash = BitConverter.ToString(SHA256.Create().ComputeHash(stream)).Replace("-", string.Empty);
+            if (!string.Equals(actualHash, expectedHash, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidDataException("安装包完整性校验失败。");
+            }
+
+            return new DownloadedUpdate(targetPath, version, source, received, actualHash);
+        }
+        catch
+        {
+            TryDelete(targetPath);
+            throw;
+        }
+    }
+
+    private async Task<string> ReadExpectedHashAsync(string address, UpdateSource source, CancellationToken cancellationToken)
+    {
+        if (!IsAllowedDownloadUrl(address, source))
+        {
+            throw new InvalidDataException("校验文件下载地址无效。");
+        }
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, address);
+        request.Headers.UserAgent.ParseAdd("WinMouseFix/update-hash");
+        using var response = await httpClient.SendAsync(request, cancellationToken);
+        response.EnsureSuccessStatusCode();
+        var content = await response.Content.ReadAsStringAsync();
+        var match = Regex.Match(content, @"(?i)\b[a-f0-9]{64}\b");
+        if (!match.Success)
+        {
+            throw new InvalidDataException("校验文件格式无效。");
+        }
+
+        return match.Value;
+    }
+
+    private static UpdateArtifact? ParseArtifact(JsonElement release, UpdateSource source)
+    {
+        if (!release.TryGetProperty("assets", out var assets) || assets.ValueKind != JsonValueKind.Array)
+        {
+            return null;
+        }
+
+        var candidates = assets.EnumerateArray()
+            .Where(asset => asset.ValueKind == JsonValueKind.Object)
+            .Select(asset => new
+            {
+                Name = ReadString(asset, "name"),
+                Url = ReadString(asset, "browser_download_url") ?? ReadString(asset, "download_url") ?? ReadString(asset, "url"),
+                Size = ReadInt64(asset, "size")
+            })
+            .Where(asset => !string.IsNullOrWhiteSpace(asset.Name) && !string.IsNullOrWhiteSpace(asset.Url))
+            .ToArray();
+        var installer = candidates
+            .Where(asset => asset.Name!.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(asset => asset.Name!.IndexOf("setup", StringComparison.OrdinalIgnoreCase) >= 0)
+            .ThenBy(asset => asset.Name, StringComparer.OrdinalIgnoreCase)
+            .FirstOrDefault();
+        if (installer is null || !IsAllowedDownloadUrl(installer.Url, source))
+        {
+            return null;
+        }
+
+        var installerStem = Path.GetFileNameWithoutExtension(installer.Name);
+        var hash = candidates.FirstOrDefault(asset => string.Equals(asset.Name, installer.Name + ".sha256", StringComparison.OrdinalIgnoreCase))
+            ?? candidates.FirstOrDefault(asset => asset.Name!.EndsWith(".sha256", StringComparison.OrdinalIgnoreCase) &&
+                                                  (asset.Name.StartsWith(installer.Name, StringComparison.OrdinalIgnoreCase) ||
+                                                   asset.Name.StartsWith(installerStem, StringComparison.OrdinalIgnoreCase)));
+        return hash is null || !IsAllowedDownloadUrl(hash.Url, source)
+            ? null
+            : new UpdateArtifact(installer.Name!, installer.Url!, installer.Size, hash.Url!);
+    }
+
+    private static long ReadInt64(JsonElement item, string propertyName)
+    {
+        if (!item.TryGetProperty(propertyName, out var value))
+        {
+            return 0;
+        }
+
+        if (value.ValueKind == JsonValueKind.Number && value.TryGetInt64(out var number))
+        {
+            return number;
+        }
+
+        return value.ValueKind == JsonValueKind.String && long.TryParse(value.GetString(), out var text) ? text : 0;
+    }
+
+    private static bool IsAllowedDownloadUrl(string? address, UpdateSource source) =>
+        Uri.TryCreate(address, UriKind.Absolute, out var uri) && uri.Scheme == Uri.UriSchemeHttps &&
+        string.Equals(uri.Host, source == UpdateSource.GitHub ? "github.com" : "gitee.com", StringComparison.OrdinalIgnoreCase);
+
+    private static void TryDelete(string path)
+    {
+        try { if (File.Exists(path)) File.Delete(path); } catch { }
     }
 
     internal static bool TryParseVersion(string? tag, out Version version)
@@ -390,16 +592,45 @@ public sealed class UpdateService
 
 internal sealed class UpdateRelease
 {
-    public UpdateRelease(UpdateSource source, ReleaseVersion releaseVersion, string displayName, string pageUrl)
+    public UpdateRelease(UpdateSource source, ReleaseVersion releaseVersion, string displayName, string pageUrl, UpdateArtifact? artifact)
     {
         Source = source;
         ReleaseVersion = releaseVersion;
         DisplayName = displayName;
         PageUrl = pageUrl;
+        Artifact = artifact;
     }
 
     public UpdateSource Source { get; }
     public ReleaseVersion ReleaseVersion { get; }
     public string DisplayName { get; }
     public string PageUrl { get; }
+    public UpdateArtifact? Artifact { get; }
+}
+
+public sealed class UpdateArtifact
+{
+    public UpdateArtifact(string fileName, string downloadUrl, long size, string sha256Url) { FileName = fileName; DownloadUrl = downloadUrl; Size = size; Sha256Url = sha256Url; }
+    public string FileName { get; }
+    public string DownloadUrl { get; }
+    public long Size { get; }
+    public string Sha256Url { get; }
+}
+
+public sealed class DownloadProgress
+{
+    public DownloadProgress(long bytesReceived, long totalBytes) { BytesReceived = bytesReceived; TotalBytes = totalBytes; }
+    public long BytesReceived { get; }
+    public long TotalBytes { get; }
+    public double Percentage => TotalBytes > 0 ? Math.Min(100, BytesReceived * 100d / TotalBytes) : 0;
+}
+
+public sealed class DownloadedUpdate
+{
+    public DownloadedUpdate(string installerPath, ReleaseVersion version, UpdateSource source, long size, string sha256) { InstallerPath = installerPath; Version = version; Source = source; Size = size; Sha256 = sha256; }
+    public string InstallerPath { get; }
+    public ReleaseVersion Version { get; }
+    public UpdateSource Source { get; }
+    public long Size { get; }
+    public string Sha256 { get; }
 }

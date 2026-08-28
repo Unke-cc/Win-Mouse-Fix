@@ -168,7 +168,7 @@ dist/
 
 首次启动时，程序读取 Windows 报告的鼠标按键数量。三键鼠标默认使用中键点击、中键长按显示桌面、中键连按打开开始菜单、中键拖动执行虚拟桌面与任务视图；五键或多键鼠标默认使用按键 4 后退、桌面与开始菜单、虚拟桌面与任务视图，以及按键 5 前进、缩放、滚动与移动。无法读取按键数量时使用五键或多键默认值；按钮页的“恢复默认值...”允许手动选择两套默认值。
 
-`scroll` 中保存 `takeOverWheel`、`horizontalModifier`、`fastModifier`、`precisionModifier` 和 `zoomModifier`。`takeOverWheel` 默认开启；关闭后核心不注册全局滚轮热键，鼠标和触摸板都使用 Windows 原生滚动。修饰键可选 `none` 或由 `ctrl`、`alt`、`shift`、`win`、`mbutton`、`xbutton1`、`xbutton2` 组成的组合，例如 `ctrl+shift`。默认依次为 `Shift`、`Alt`、`Win`、`Ctrl`；快速滚动使用当前速度的 4 倍，精确滚动使用四分之一，同一组合不能重复分配。`timing.dragThresholdPx` 保存拖动触发距离，范围为 5 至 200 像素，默认 12 像素；鼠标按钮同时设置按住并滚动时，滚轮优先使用修饰键功能。
+`scroll` 中保存 `takeOverWheel`、`reverse`、`speed`、`smooth`、`inertia` 及四种滚轮修饰键。`takeOverWheel` 默认开启；关闭后核心不注册全局滚轮热键，鼠标和触摸板都使用 Windows 原生滚动。`inertia` 默认关闭，开启后普通垂直滚轮追加短暂减速尾部，并优先于 `smooth`；按住按钮滚动、水平滚动、缩放和快速/精确滚动不使用惯性。修饰键可选 `none` 或由 `ctrl`、`alt`、`shift`、`win`、`mbutton`、`xbutton1`、`xbutton2` 组成的组合，例如 `ctrl+shift`。默认依次为 `Shift`、`Alt`、`Win`、`Ctrl`；快速滚动使用当前速度的 4 倍，精确滚动使用四分之一，同一组合不能重复分配。`timing.dragThresholdPx` 保存拖动触发距离，范围为 5 至 200 像素，默认 12 像素；鼠标按钮同时设置按住并滚动时，滚轮优先使用修饰键功能。
 
 Windows 当前事件层无法直接标记设备来源，核心不再根据滚轮频率猜测触摸板输入，也不会临时暂停滚轮热键。需要保持触摸板原生行为时，应关闭“接管鼠标滚动”；开启接管时，应用无法保证区分触摸板和实体鼠标。
 

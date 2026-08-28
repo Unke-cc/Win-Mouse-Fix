@@ -101,8 +101,13 @@
                                      Style="{StaticResource TopNavigationItem}" Checked="Navigation_Checked" />
                         <RadioButton x:Name="ScrollNavigation" Content="滚动" GroupName="Navigation"
                                      Style="{StaticResource TopNavigationItem}" Checked="Navigation_Checked" />
-                        <RadioButton x:Name="AboutNavigation" Content="关于" GroupName="Navigation"
-                                     Style="{StaticResource TopNavigationItem}" Checked="Navigation_Checked" />
+                        <Grid>
+                            <RadioButton x:Name="AboutNavigation" Content="关于" GroupName="Navigation"
+                                         Style="{StaticResource TopNavigationItem}" Checked="Navigation_Checked" />
+                            <Ellipse x:Name="UpdateBadge" Width="7" Height="7" Fill="#E5484D"
+                                     HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,4,5,0"
+                                     Visibility="Collapsed" />
+                        </Grid>
                     </StackPanel>
                 </Border>
 
@@ -417,6 +422,19 @@
                         <Grid>
                             <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                             <StackPanel>
+                                <TextBlock Text="惯性滚动" Style="{StaticResource SectionTitle}" />
+                                <TextBlock Text="松开滚轮后继续短暂减速滚动；开启后优先于基础平滑。" Foreground="{StaticResource MutedTextBrush}" />
+                            </StackPanel>
+                            <CheckBox Grid.Column="1" Style="{StaticResource ToggleSwitch}"
+                                      AutomationProperties.Name="惯性滚动"
+                                      IsChecked="{Binding Scroll.Inertia, Mode=TwoWay}" />
+                        </Grid>
+                    </Border>
+
+                    <Border Style="{StaticResource Card}">
+                        <Grid>
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <StackPanel>
                                 <TextBlock Text="接管鼠标滚动" Style="{StaticResource SectionTitle}" />
                                 <TextBlock Text="关闭后滚轮和触控板完全使用 Windows 原生行为。" Foreground="{StaticResource MutedTextBrush}" />
                             </StackPanel>
@@ -462,8 +480,7 @@
                                         <TextBlock Text="快速滚动" FontWeight="SemiBold" />
                                         <TextBlock Text="当前速度的 4 倍。" Foreground="{StaticResource MutedTextBrush}" FontSize="11" />
                                     </StackPanel>
-                                    <TextBox Grid.Column="1" Tag="FastModifier" IsReadOnly="True"
-                                             Text="{Binding Scroll.FastModifier, Converter={StaticResource ModifierShortcutConverter}}"
+                                    <TextBox Grid.Column="1" x:Name="FastModifierBox" Tag="FastModifier" IsReadOnly="True"
                                              PreviewKeyDown="ModifierShortcutBox_PreviewKeyDown"
                                              PreviewMouseDown="ModifierShortcutBox_PreviewMouseDown"
                                              MouseEnter="ModifierShortcutBox_MouseEnter"
@@ -477,8 +494,7 @@
                                         <TextBlock Text="精确滚动" FontWeight="SemiBold" />
                                         <TextBlock Text="当前速度的四分之一。" Foreground="{StaticResource MutedTextBrush}" FontSize="11" />
                                     </StackPanel>
-                                    <TextBox Grid.Column="1" Tag="PrecisionModifier" IsReadOnly="True"
-                                             Text="{Binding Scroll.PrecisionModifier, Converter={StaticResource ModifierShortcutConverter}}"
+                                    <TextBox Grid.Column="1" x:Name="PrecisionModifierBox" Tag="PrecisionModifier" IsReadOnly="True"
                                              PreviewKeyDown="ModifierShortcutBox_PreviewKeyDown"
                                              PreviewMouseDown="ModifierShortcutBox_PreviewMouseDown"
                                              MouseEnter="ModifierShortcutBox_MouseEnter"
@@ -549,8 +565,18 @@
                             <StackPanel Orientation="Horizontal" Margin="0,20,0,0">
                                 <Button x:Name="CheckForUpdatesButton" Content="检查更新" Style="{StaticResource PrimaryButton}"
                                         Click="CheckForUpdates_Click" Margin="0,0,10,0" />
+                                <Button x:Name="DownloadUpdateButton" Content="下载更新" Style="{StaticResource PrimaryButton}"
+                                        Click="DownloadUpdate_Click" Margin="0,0,10,0" Visibility="Collapsed" />
+                                <Button x:Name="CancelUpdateButton" Content="取消下载" Click="CancelUpdate_Click"
+                                        Margin="0,0,10,0" Visibility="Collapsed" />
+                                <Button x:Name="InstallUpdateButton" Content="立即安装" Style="{StaticResource PrimaryButton}"
+                                        Click="InstallUpdate_Click" Margin="0,0,10,0" Visibility="Collapsed" />
                                 <Button x:Name="OpenProjectHomepageButton" Content="打开项目主页" Click="OpenProjectHomepage_Click" Margin="0,0,10,0" />
                                 <Button x:Name="OpenLicenseButton" Content="查看许可" Click="OpenLicense_Click" />
+                            </StackPanel>
+                            <StackPanel x:Name="UpdateProgressPanel" Margin="0,12,0,0" Visibility="Collapsed">
+                                <ProgressBar x:Name="UpdateProgressBar" Height="8" Minimum="0" Maximum="100" />
+                                <TextBlock x:Name="UpdateStatusText" Margin="0,5,0,0" Foreground="{StaticResource MutedTextBrush}" />
                             </StackPanel>
                         </StackPanel>
                     </Border>

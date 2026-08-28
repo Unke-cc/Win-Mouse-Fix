@@ -342,6 +342,7 @@ public sealed class ScrollConfig : BindableBase
     private bool reverse;
     private double speed = 1.0;
     private bool smooth;
+    private bool inertia;
     private string horizontalModifier = "shift";
     private string fastModifier = "alt";
     private string precisionModifier = "win";
@@ -369,6 +370,12 @@ public sealed class ScrollConfig : BindableBase
     {
         get => smooth;
         set => SetProperty(ref smooth, value);
+    }
+
+    public bool Inertia
+    {
+        get => inertia;
+        set => SetProperty(ref inertia, value);
     }
 
     public string HorizontalModifier

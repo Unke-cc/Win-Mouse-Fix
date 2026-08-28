@@ -35,6 +35,7 @@
         "reverse": { "type": "boolean" },
         "speed": { "type": "number", "minimum": 0.25, "maximum": 4.0 },
         "smooth": { "type": "boolean" },
+        "inertia": { "type": "boolean", "default": false },
         "horizontalModifier": { "$ref": "#/$defs/modifier" },
         "fastModifier": { "$ref": "#/$defs/modifier" },
         "precisionModifier": { "$ref": "#/$defs/modifier" },

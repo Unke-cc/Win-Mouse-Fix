@@ -18,6 +18,7 @@ try
     Assert(modelDefault.DesktopSwipeDirection == "followMouse", "Model default direction is incorrect.");
     Assert(!modelDefault.ReceiveBetaUpdates, "Beta updates must be disabled by default.");
     Assert(modelDefault.Scroll.TakeOverWheel, "Mouse wheel takeover must be enabled by default.");
+    Assert(!modelDefault.Scroll.Inertia, "Inertial scrolling must be disabled by default.");
     AssertFiveOrMoreDefaults(modelDefault.Remaps);
     Assert(modelDefault.Scroll.HorizontalModifier == "shift" && modelDefault.Scroll.FastModifier == "alt" &&
            modelDefault.Scroll.PrecisionModifier == "win" && modelDefault.Scroll.ZoomModifier == "ctrl",
@@ -94,6 +95,7 @@ try
     invalidField.DesktopSwipeDirection = "oppositeMouse";
     invalidField.ReceiveBetaUpdates = true;
     invalidField.Scroll.TakeOverWheel = false;
+    invalidField.Scroll.Inertia = true;
     invalidField.Scroll.HorizontalModifier = "invalid";
     invalidField.Scroll.FastModifier = "ctrl";
     invalidField.Timing.DragThresholdPx = 48;
@@ -102,6 +104,7 @@ try
     Assert(roundTrip.DesktopSwipeDirection == "oppositeMouse", "Direction did not survive save and reload.");
     Assert(roundTrip.ReceiveBetaUpdates, "Beta update preference did not survive save and reload.");
     Assert(!roundTrip.Scroll.TakeOverWheel, "Mouse wheel takeover setting did not survive save and reload.");
+    Assert(roundTrip.Scroll.Inertia, "Inertial scrolling setting did not survive save and reload.");
     Assert(roundTrip.Timing.DragThresholdPx == 48, "Drag threshold did not survive save and reload.");
     Assert(roundTrip.Scroll.HorizontalModifier == "shift" && roundTrip.Scroll.FastModifier == "ctrl",
         "Scroll modifier normalization or persistence is incorrect.");
@@ -156,6 +159,7 @@ static void CheckDefaultFile()
         "Default file desktop and Start menu mapping is missing.");
     var scroll = document.RootElement.GetProperty("scroll");
     Assert(scroll.GetProperty("takeOverWheel").GetBoolean(), "Default file must enable mouse wheel takeover.");
+    Assert(!scroll.GetProperty("inertia").GetBoolean(), "Default file must disable inertial scrolling.");
     Assert(scroll.GetProperty("horizontalModifier").GetString() == "shift" &&
            scroll.GetProperty("fastModifier").GetString() == "alt" &&
            scroll.GetProperty("precisionModifier").GetString() == "win" &&
@@ -182,6 +186,8 @@ static void CheckSchema()
     var scrollProperties = root.GetProperty("properties").GetProperty("scroll").GetProperty("properties");
     Assert(scrollProperties.GetProperty("takeOverWheel").GetProperty("type").GetString() == "boolean",
         "Schema does not define mouse wheel takeover as a boolean.");
+    Assert(scrollProperties.GetProperty("inertia").GetProperty("type").GetString() == "boolean",
+        "Schema does not define inertial scrolling as a boolean.");
     Assert(new[] { "horizontalModifier", "fastModifier", "precisionModifier", "zoomModifier" }
             .All(name => scrollProperties.TryGetProperty(name, out _)),
         "Schema does not define all scroll modifiers.");
@@ -436,6 +442,33 @@ static async Task CheckUpdateServiceAsync()
     var stable = await service.CheckAsync(new Version(0, 1, 1), includeBeta: false);
     Assert(stable.Source == UpdateSource.GitHub && stable.Version == new Version(0, 1, 2),
         "Stable update selection is incorrect.");
+
+    var installerBytes = System.Text.Encoding.UTF8.GetBytes("win mouse fix installer");
+    var installerHash = BitConverter.ToString(System.Security.Cryptography.SHA256.Create().ComputeHash(installerBytes)).Replace("-", string.Empty);
+    using var downloadClient = new HttpClient(new StubHttpHandler(request =>
+    {
+        if (request.RequestUri?.AbsolutePath.EndsWith(".sha256", StringComparison.OrdinalIgnoreCase) == true)
+        {
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent($"{installerHash}  WinMouseFix-0.2.0.exe") };
+        }
+
+        if (request.RequestUri?.AbsolutePath.IndexOf("releases/download", StringComparison.OrdinalIgnoreCase) >= 0)
+        {
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(installerBytes) };
+        }
+
+        return new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent($"[{{ \"tag_name\": \"v0.2.0\", \"name\": \"Stable 0.2.0\", \"draft\": false, \"prerelease\": false, \"html_url\": \"https://github.com/Unke-cc/Win-Mouse-Fix/releases/tag/v0.2.0\", \"assets\": [{{ \"name\": \"WinMouseFix-0.2.0.exe\", \"size\": {installerBytes.Length}, \"browser_download_url\": \"https://github.com/Unke-cc/Win-Mouse-Fix/releases/download/v0.2.0/WinMouseFix-0.2.0.exe\" }}, {{ \"name\": \"WinMouseFix-0.2.0.exe.sha256\", \"size\": 80, \"browser_download_url\": \"https://github.com/Unke-cc/Win-Mouse-Fix/releases/download/v0.2.0/WinMouseFix-0.2.0.exe.sha256\" }}] }}]" )
+        };
+    }));
+    var downloadable = await new UpdateService(downloadClient).CheckAsync(new Version(0, 1, 1), includeBeta: false);
+    Assert(downloadable.CanDownload && downloadable.Artifact?.Size == installerBytes.Length,
+        "Release installer assets were not parsed.");
+    var downloaded = await new UpdateService(downloadClient).DownloadAndVerifyAsync(downloadable);
+    Assert(File.Exists(downloaded.InstallerPath) && downloaded.Size == installerBytes.Length,
+        "Installer download and checksum validation failed.");
+    File.Delete(downloaded.InstallerPath);
     var beta = await service.CheckAsync(new Version(0, 1, 1), includeBeta: true);
     Assert(beta.Source == UpdateSource.GitHub && beta.Version == new Version(0, 2, 0),
         "Beta update selection is incorrect.");

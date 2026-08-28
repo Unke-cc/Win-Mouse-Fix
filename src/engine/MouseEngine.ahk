@@ -59,6 +59,9 @@ class WinMouseFixEngine {
         if this.config["scroll"]["takeOverWheel"] != true && this.config["scroll"]["takeOverWheel"] != false {
             throw Error("Invalid mouse wheel takeover setting.")
         }
+        if this.config["scroll"]["inertia"] != true && this.config["scroll"]["inertia"] != false {
+            throw Error("Invalid inertial scrolling setting.")
+        }
         for remap in this.config["remaps"] {
             if remap["button"] = "" || !ConfigManager.TriggerNames.Has(remap["trigger"]) {
                 throw Error("Invalid remap.")
