@@ -3,7 +3,7 @@
 ## 1. 文档信息
 
 - 状态：已实现并持续更新
-- 适用版本：0.1.4 Beta
+- 适用版本：0.1.5
 - 用途：统一产品范围、用户操作、程序组成、发布方式和验收标准
 
 ## 2. 产品目标
@@ -24,7 +24,7 @@ AutoHotkey v2 负责全部核心鼠标功能，GUI 负责把原本需要编写�
 
 本产品不是通用 AutoHotkey 编辑器。核心价值是降低鼠标配置难度，同时保留 AutoHotkey v2 在鼠标按键、滚轮、组合动作和应用规则方面的能力。
 
-## 3. 0.1.4 Beta 已实现范围
+## 3. 0.1.5 已实现范围
 
 当前版本包含：
 
@@ -107,7 +107,7 @@ GUI 是配置文件的唯一修改者；AutoHotkey v2 只读取经过检查的�
 
 Inno Setup 将界面、鼠标功能及所需运行文件组合为统一安装程序。安装范围为当前用户，默认目录为 `%LocalAppData%\Programs\Win Mouse Fix`；安装器创建开始菜单入口，并提供可选桌面快捷方式。
 
-固定 `AppId` 用于识别同一产品并支持直接更新。安装和卸载均不删除 `%AppData%\WinMouseFix`，因此用户设置会保留；卸载时删除 Win Mouse Fix 的登录运行登记。`.\scripts\package.ps1` 生成 `dist/WinMouseFix-Setup-0.1.4-beta.exe`。
+固定 `AppId` 用于识别同一产品并支持直接更新。安装和卸载均不删除 `%AppData%\WinMouseFix`，因此用户设置会保留；卸载时删除 Win Mouse Fix 的登录运行登记。`.\scripts\package.ps1` 生成 `dist/WinMouseFix-Setup-0.1.5.exe`。
 
 ### 6.7 系统与体积范围
 
@@ -239,7 +239,7 @@ Windows 当前事件层无法直接标记设备来源，核心不再根据滚轮
 
 - `.\scripts\validate.ps1` 执行成功。
 - `.\scripts\build.ps1` 生成 `dist/app/WinMouseFix.exe` 和 `dist/app/WinMouseFix.Engine.exe`。
-- `.\scripts\package.ps1` 生成 `dist/WinMouseFix-Setup-0.1.4-beta.exe`。
+- `.\scripts\package.ps1` 生成 `dist/WinMouseFix-Setup-0.1.5.exe`。
 - 安装程序在 Windows 10 22H2 x64 和 Windows 11 x64 中正确检查 .NET Framework 4.8 并启动。
 - GUI 主程序及其依赖合计不超过 10 MiB，鼠标核心、配置和资源文件不计入该数值。
 - 开始菜单启动、直接更新、卸载、便携运行和登录后静默运行均符合预期。

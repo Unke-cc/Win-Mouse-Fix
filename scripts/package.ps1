@@ -9,7 +9,7 @@ $ErrorActionPreference = "Stop"
 
 $repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $installerScript = Join-Path $repositoryRoot "installer\WinMouseFix.iss"
-$expectedOutput = Join-Path $repositoryRoot "dist\WinMouseFix-Setup-0.1.4-beta.exe"
+$expectedOutput = Join-Path $repositoryRoot "dist\WinMouseFix-Setup-0.1.5.exe"
 
 & (Join-Path $PSScriptRoot "build.ps1") -Configuration $Configuration
 if ($LASTEXITCODE -ne 0) {
@@ -42,4 +42,10 @@ if (-not (Test-Path -LiteralPath $expectedOutput -PathType Leaf)) {
     exit 1
 }
 
+${hash} = (Get-FileHash -LiteralPath $expectedOutput -Algorithm SHA256).Hash.ToLowerInvariant()
+${checksumOutput} = "$expectedOutput.sha256"
+$checksumContent = "$hash  $(Split-Path -Leaf $expectedOutput)$([Environment]::NewLine)"
+[System.IO.File]::WriteAllText($checksumOutput, $checksumContent, [System.Text.UTF8Encoding]::new($false))
+
 Write-Host "Package completed: $expectedOutput" -ForegroundColor Green
+Write-Host "SHA256: $checksumOutput" -ForegroundColor Green
