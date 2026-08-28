@@ -38,6 +38,7 @@
     }
   ],
   "scroll": {
+    "takeOverWheel": true,
     "reverse": false,
     "speed": 1.0,
     "smooth": false,

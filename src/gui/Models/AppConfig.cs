@@ -338,6 +338,7 @@ public sealed class ActionConfig : BindableBase
 
 public sealed class ScrollConfig : BindableBase
 {
+    private bool takeOverWheel = true;
     private bool reverse;
     private double speed = 1.0;
     private bool smooth;
@@ -345,6 +346,12 @@ public sealed class ScrollConfig : BindableBase
     private string fastModifier = "alt";
     private string precisionModifier = "win";
     private string zoomModifier = "ctrl";
+
+    public bool TakeOverWheel
+    {
+        get => takeOverWheel;
+        set => SetProperty(ref takeOverWheel, value);
+    }
 
     public bool Reverse
     {

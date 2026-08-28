@@ -31,6 +31,7 @@
       "additionalProperties": false,
       "required": ["reverse", "speed", "smooth"],
       "properties": {
+        "takeOverWheel": { "type": "boolean", "default": true },
         "reverse": { "type": "boolean" },
         "speed": { "type": "number", "minimum": 0.25, "maximum": 4.0 },
         "smooth": { "type": "boolean" },

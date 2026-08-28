@@ -17,6 +17,7 @@ try
     var modelDefault = new AppConfig();
     Assert(modelDefault.DesktopSwipeDirection == "followMouse", "Model default direction is incorrect.");
     Assert(!modelDefault.ReceiveBetaUpdates, "Beta updates must be disabled by default.");
+    Assert(modelDefault.Scroll.TakeOverWheel, "Mouse wheel takeover must be enabled by default.");
     AssertFiveOrMoreDefaults(modelDefault.Remaps);
     Assert(modelDefault.Scroll.HorizontalModifier == "shift" && modelDefault.Scroll.FastModifier == "alt" &&
            modelDefault.Scroll.PrecisionModifier == "win" && modelDefault.Scroll.ZoomModifier == "ctrl",
@@ -59,6 +60,7 @@ try
     var migrated = await service.LoadAsync();
     Assert(migrated.ConfigVersion == 2, "configVersion was not migrated to 2.");
     Assert(migrated.DoubleClickSpeed == "fast", "Legacy double-click speed did not default to fast.");
+    Assert(migrated.Scroll.TakeOverWheel, "Legacy configuration did not default mouse wheel takeover to enabled.");
     Assert(migrated.DesktopSwipeDirection == "followMouse", "Legacy direction did not default to followMouse.");
     Assert(HasRemap(migrated, "MButton", "click", "Original"), "Click mapping was not migrated.");
     Assert(HasRemap(migrated, "MButton", "dragUp", "TaskView"), "Directional drag mapping was not preserved.");
@@ -91,6 +93,7 @@ try
 
     invalidField.DesktopSwipeDirection = "oppositeMouse";
     invalidField.ReceiveBetaUpdates = true;
+    invalidField.Scroll.TakeOverWheel = false;
     invalidField.Scroll.HorizontalModifier = "invalid";
     invalidField.Scroll.FastModifier = "ctrl";
     invalidField.Timing.DragThresholdPx = 48;
@@ -98,6 +101,7 @@ try
     var roundTrip = await service.LoadAsync();
     Assert(roundTrip.DesktopSwipeDirection == "oppositeMouse", "Direction did not survive save and reload.");
     Assert(roundTrip.ReceiveBetaUpdates, "Beta update preference did not survive save and reload.");
+    Assert(!roundTrip.Scroll.TakeOverWheel, "Mouse wheel takeover setting did not survive save and reload.");
     Assert(roundTrip.Timing.DragThresholdPx == 48, "Drag threshold did not survive save and reload.");
     Assert(roundTrip.Scroll.HorizontalModifier == "shift" && roundTrip.Scroll.FastModifier == "ctrl",
         "Scroll modifier normalization or persistence is incorrect.");
@@ -151,6 +155,7 @@ static void CheckDefaultFile()
                              item.GetProperty("action").GetProperty("type").GetString() == "DesktopStartMenu"),
         "Default file desktop and Start menu mapping is missing.");
     var scroll = document.RootElement.GetProperty("scroll");
+    Assert(scroll.GetProperty("takeOverWheel").GetBoolean(), "Default file must enable mouse wheel takeover.");
     Assert(scroll.GetProperty("horizontalModifier").GetString() == "shift" &&
            scroll.GetProperty("fastModifier").GetString() == "alt" &&
            scroll.GetProperty("precisionModifier").GetString() == "win" &&
@@ -175,6 +180,8 @@ static void CheckSchema()
     Assert(root.GetProperty("properties").TryGetProperty("receiveBetaUpdates", out _),
         "Schema does not define receiveBetaUpdates.");
     var scrollProperties = root.GetProperty("properties").GetProperty("scroll").GetProperty("properties");
+    Assert(scrollProperties.GetProperty("takeOverWheel").GetProperty("type").GetString() == "boolean",
+        "Schema does not define mouse wheel takeover as a boolean.");
     Assert(new[] { "horizontalModifier", "fastModifier", "precisionModifier", "zoomModifier" }
             .All(name => scrollProperties.TryGetProperty(name, out _)),
         "Schema does not define all scroll modifiers.");

@@ -414,6 +414,19 @@
                     </Border>
 
                     <Border Style="{StaticResource Card}">
+                        <Grid>
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="接管鼠标滚动" Style="{StaticResource SectionTitle}" />
+                                <TextBlock Text="关闭后滚轮和触控板完全使用 Windows 原生行为。" Foreground="{StaticResource MutedTextBrush}" />
+                            </StackPanel>
+                            <CheckBox Grid.Column="1" Style="{StaticResource ToggleSwitch}"
+                                      AutomationProperties.Name="接管鼠标滚动"
+                                      IsChecked="{Binding Scroll.TakeOverWheel, Mode=TwoWay}" />
+                        </Grid>
+                    </Border>
+
+                    <Border Style="{StaticResource Card}">
                         <StackPanel>
                             <TextBlock Text="修饰键" Style="{StaticResource SectionTitle}" />
                             <TextBlock Text="按住 Ctrl、Alt、Shift、Win，或中键、按键4、按键5并滚动滚轮，即可执行对应动作。"

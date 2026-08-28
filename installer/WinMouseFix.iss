@@ -47,6 +47,8 @@ Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChang
 [Code]
 const
   DotNet48Release = 528040;
+  ShutdownTimeoutMs = 10000;
+  ShutdownPollIntervalMs = 200;
 
 function IsDotNet48Installed: Boolean;
 var
@@ -92,15 +94,59 @@ begin
       '--shutdown',
       ExpandConstant('{app}'),
       SW_HIDE,
-      ewWaitUntilTerminated,
+      ewNoWait,
       ResultCode);
+  end;
+end;
+
+function ApplicationsAreRunning: Boolean;
+var
+  ResultCode: Integer;
+  Output: TExecOutput;
+  I: Integer;
+  Line: String;
+begin
+  Result := False;
+  if not ExecAndCaptureOutput(
+    ExpandConstant('{sys}\tasklist.exe'),
+    '/FO CSV /NH',
+    '',
+    SW_HIDE,
+    ewWaitUntilTerminated,
+    ResultCode,
+    Output) then
+    Exit;
+
+  for I := 0 to GetArrayLength(Output.StdOut) - 1 do
+  begin
+    Line := LowerCase(Output.StdOut[I]);
+    if (Pos(LowerCase('{#MyAppExeName}'), Line) > 0) or
+      (Pos('winmousefix.tray.exe', Line) > 0) or
+      (Pos('winmousefix.engine.exe', Line) > 0) then
+    begin
+      Result := True;
+      Exit;
+    end;
+  end;
+end;
+
+procedure WaitForApplicationsToExit;
+var
+  I: Integer;
+begin
+  for I := 1 to ShutdownTimeoutMs div ShutdownPollIntervalMs do
+  begin
+    if not ApplicationsAreRunning then
+      Exit;
+    Sleep(ShutdownPollIntervalMs);
   end;
 end;
 
 procedure CloseRunningApplications;
 begin
   RequestApplicationShutdown;
-  Sleep(5000);
+  WaitForApplicationsToExit;
+
   StopApplication('{#MyAppExeName}');
   StopApplication('WinMouseFix.Tray.exe');
   StopApplication('WinMouseFix.Engine.exe');

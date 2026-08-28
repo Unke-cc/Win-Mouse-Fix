@@ -13,13 +13,6 @@ class MouseManager {
         this.smoothQueue := []
         this.smoothTimer := ObjBindMethod(this, "ProcessSmoothWheel")
         this.motionTimer := ObjBindMethod(this, "CheckMotionAndContext")
-        this.wheelRestoreTimer := ObjBindMethod(this, "RestoreWheelHotkeys")
-        this.wheelHotkeysSuspended := false
-        this.wheelBurstStart := 0
-        this.wheelBurstCount := 0
-        this.wheelBurstWindowMs := 300
-        this.wheelBurstThreshold := 20
-        this.wheelSuspendMs := 750
         this.lastCanHandle := appRuleManager.ShouldHandle()
         this.SetConfig(config)
     }
@@ -41,7 +34,6 @@ class MouseManager {
         this.scrollMode := "regular"
         this.smoothQueue := []
         SetTimer(this.smoothTimer, 0)
-        this.ResetWheelFilter()
         if wasStarted {
             this.RegisterHotkeys()
         }
@@ -112,9 +104,10 @@ class MouseManager {
                 FileAppend("Ignoring unsupported input " buttonName ": " registrationError.Message "`n", "**")
             }
         }
-        Hotkey("$*WheelUp", ObjBindMethod(this, "OnWheel", "up"), "On")
-        Hotkey("$*WheelDown", ObjBindMethod(this, "OnWheel", "down"), "On")
-        this.wheelHotkeysSuspended := false
+        if this.scrollConfig["takeOverWheel"] {
+            Hotkey("$*WheelUp", ObjBindMethod(this, "OnWheel", "up"), "On")
+            Hotkey("$*WheelDown", ObjBindMethod(this, "OnWheel", "down"), "On")
+        }
         SetTimer(this.motionTimer, 15)
     }
 
@@ -130,9 +123,7 @@ class MouseManager {
     UnregisterHotkeys() {
         SetTimer(this.motionTimer, 0)
         SetTimer(this.smoothTimer, 0)
-        SetTimer(this.wheelRestoreTimer, 0)
         this.smoothQueue := []
-        this.wheelHotkeysSuspended := false
         for buttonName in this.registeredButtons {
             try Hotkey("$*" buttonName, "Off")
             try Hotkey("$*" buttonName " Up", "Off")
@@ -328,10 +319,6 @@ class MouseManager {
     }
 
     OnWheel(direction, *) {
-        if this.ShouldFilterTouchpadBurst() {
-            this.SuspendWheelHotkeys()
-            return
-        }
         if this.appRuleManager.ShouldHandle() && this.TryModifierWheel(direction, true) {
             return
         }
@@ -379,72 +366,6 @@ class MouseManager {
             return
         }
         this.SendRegularWheel(direction)
-    }
-
-    ShouldFilterTouchpadBurst() {
-        ; Windows exposes many touchpad gestures as a high-frequency wheel stream.
-        ; AHK's wheel hotkey does not include the originating device, so only
-        ; neutral, unmodified bursts are treated as touchpad input here.
-        if !this.appRuleManager.ShouldHandle() {
-            this.wheelBurstStart := 0
-            this.wheelBurstCount := 0
-            return false
-        }
-        if this.FindActiveHeldButton() != "" || this.HasPressedScrollModifier() {
-            this.wheelBurstStart := 0
-            this.wheelBurstCount := 0
-            return false
-        }
-
-        now := A_TickCount
-        if this.wheelBurstStart = 0 || now - this.wheelBurstStart > this.wheelBurstWindowMs {
-            this.wheelBurstStart := now
-            this.wheelBurstCount := 0
-        }
-        this.wheelBurstCount += 1
-        return this.wheelBurstCount >= this.wheelBurstThreshold
-    }
-
-    HasPressedScrollModifier() {
-        for _, modifier in [
-            this.scrollConfig["horizontalModifier"],
-            this.scrollConfig["fastModifier"],
-            this.scrollConfig["precisionModifier"],
-            this.scrollConfig["zoomModifier"]
-        ] {
-            if modifier != "none" && this.IsModifierPressed(modifier) {
-                return true
-            }
-        }
-        return false
-    }
-
-    SuspendWheelHotkeys() {
-        if this.wheelHotkeysSuspended {
-            return
-        }
-        try Hotkey("$*WheelUp", "Off")
-        try Hotkey("$*WheelDown", "Off")
-        this.wheelHotkeysSuspended := true
-        SetTimer(this.wheelRestoreTimer, -this.wheelSuspendMs)
-    }
-
-    RestoreWheelHotkeys(*) {
-        if !this.started {
-            return
-        }
-        Hotkey("$*WheelUp", ObjBindMethod(this, "OnWheel", "up"), "On")
-        Hotkey("$*WheelDown", ObjBindMethod(this, "OnWheel", "down"), "On")
-        this.wheelHotkeysSuspended := false
-        this.wheelBurstStart := 0
-        this.wheelBurstCount := 0
-    }
-
-    ResetWheelFilter() {
-        SetTimer(this.wheelRestoreTimer, 0)
-        this.wheelHotkeysSuspended := false
-        this.wheelBurstStart := 0
-        this.wheelBurstCount := 0
     }
 
     TryModifierWheel(direction, mouseOnly := false) {

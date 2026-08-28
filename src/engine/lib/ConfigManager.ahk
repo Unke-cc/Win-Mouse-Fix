@@ -273,6 +273,7 @@ class ConfigManager {
             }
         }
         return Map(
+            "takeOverWheel", this.ReadBoolean(source, "takeOverWheel", true),
             "reverse", this.ReadBoolean(source, "reverse", false),
             "speed", this.ReadNumber(source, "speed", 1.0, 0.25, 4.0),
             "smooth", this.ReadBoolean(source, "smooth", false),
@@ -354,6 +355,7 @@ class ConfigManager {
             "desktopSwipeDirection", "followMouse",
             "remaps", remaps,
             "scroll", Map(
+                "takeOverWheel", true,
                 "reverse", false,
                 "speed", 1.0,
                 "smooth", false,

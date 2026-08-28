@@ -56,6 +56,9 @@ class WinMouseFixEngine {
             && this.config["desktopSwipeDirection"] != "oppositeMouse" {
             throw Error("Unsupported desktopSwipeDirection.")
         }
+        if this.config["scroll"]["takeOverWheel"] != true && this.config["scroll"]["takeOverWheel"] != false {
+            throw Error("Invalid mouse wheel takeover setting.")
+        }
         for remap in this.config["remaps"] {
             if remap["button"] = "" || !ConfigManager.TriggerNames.Has(remap["trigger"]) {
                 throw Error("Invalid remap.")
@@ -82,6 +85,10 @@ class WinMouseFixEngine {
         if fallbackConfig["timing"]["holdMs"] != 500
             || fallbackConfig["timing"]["dragThresholdPx"] != 12 {
             throw Error("Timing fallback self-check failed.")
+        }
+        disabledWheelConfig := this.configManager.Normalize(Map("scroll", Map("takeOverWheel", 0)))
+        if disabledWheelConfig["scroll"]["takeOverWheel"] != false {
+            throw Error("Mouse wheel takeover fallback self-check failed.")
         }
         if MouseManager.ResolveClickAction(Map("type", "None", "shortcut", ""))["type"] != "Original" {
             throw Error("Unmapped click fallback self-check failed.")
