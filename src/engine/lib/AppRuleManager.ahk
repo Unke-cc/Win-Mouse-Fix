@@ -1,5 +1,6 @@
 #Requires AutoHotkey v2.0
 
+; 判断是否接管。看开关、暂停、排除、全屏。
 class AppRuleManager {
     __New(config) {
         this.userPaused := false
@@ -22,6 +23,7 @@ class AppRuleManager {
         }
 
         hwnd := WinExist("A")
+        ; WinExist 失败仍接管。
         if !hwnd {
             return true
         }
@@ -40,6 +42,7 @@ class AppRuleManager {
         try processName := StrLower(WinGetProcessName("ahk_id " hwnd))
         try processPath := StrLower(WinGetProcessPath("ahk_id " hwnd))
 
+        ; 路径优先。其次进程名。进程名也可拿来比路径。
         for rule in this.excludedApps {
             ruleName := StrLower(Trim(rule["name"]))
             rulePath := StrLower(Trim(rule["path"]))
@@ -59,9 +62,11 @@ class AppRuleManager {
     IsFullscreenWindow(hwnd) {
         try {
             windowClass := WinGetClass("ahk_id " hwnd)
+            ; 桌面与任务栏不当成全屏。
             if this.IsDesktopSurfaceClass(windowClass) {
                 return false
             }
+            ; 最大化或最小化则否。
             if WinGetMinMax("ahk_id " hwnd) != 0 {
                 return false
             }
@@ -82,6 +87,7 @@ class AppRuleManager {
                 || centerY < monitorTop || centerY >= monitorBottom {
                 continue
             }
+            ; 窗体盖住显示器。容差 3 像素。
             tolerance := 3
             return windowLeft <= monitorLeft + tolerance
                 && windowTop <= monitorTop + tolerance
@@ -91,6 +97,7 @@ class AppRuleManager {
         return false
     }
 
+    ; 类名属于桌面、任务栏、任务视图。
     IsDesktopSurfaceClass(windowClass) {
         return windowClass = "Progman"
             || windowClass = "WorkerW"

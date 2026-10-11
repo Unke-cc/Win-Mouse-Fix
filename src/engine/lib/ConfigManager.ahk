@@ -1,5 +1,6 @@
 #Requires AutoHotkey v2.0
 
+; JSON 读入。缺项补全。buttons 改写成 remaps。
 class ConfigManager {
     static TriggerNames := Map(
         "click", true,
@@ -58,6 +59,7 @@ class ConfigManager {
         this.lastError := ""
     }
 
+        ; 先读 AppData。没有则读默认文件。都失败则用代码里那套。
     Load() {
         preferredPath := this.GetPreferredPath()
         config := 0
@@ -87,6 +89,7 @@ class ConfigManager {
         }
 
         normalized := this.Normalize(config)
+        ; 指纹对着 GetPreferredPath。即便内容来自回退。
         this.fingerprint := this.GetFingerprint(this.GetPreferredPath())
         return normalized
     }
@@ -103,6 +106,7 @@ class ConfigManager {
         return FileExist(this.defaultPath) ? this.defaultPath : ""
     }
 
+    ; 路径、mtime、长度、校验和。缺文件为 missing。
     GetFingerprint(path) {
         if path = "" || !FileExist(path) {
             return "missing"
@@ -123,6 +127,7 @@ class ConfigManager {
         defaults := this.CreateBuiltInDefaults()
         timingSource := this.ReadMap(source, "timing", Map())
         speed := this.ReadString(source, "doubleClickSpeed", "")
+        ; 没有 doubleClickSpeed，则看 multiClickMs。
         if speed != "fast" && speed != "medium" && speed != "slow" {
             oldInterval := this.ReadInteger(timingSource, "multiClickMs", 150, 150, 800)
             speed := oldInterval <= 200 ? "fast" : oldInterval <= 325 ? "medium" : "slow"
@@ -132,6 +137,7 @@ class ConfigManager {
         if !(remaps is Array) {
             remaps := this.ConvertLegacyButtons(this.ReadMap(source, "buttons", Map()))
         }
+        ; remaps 空且无 buttons，才填代码里 remaps。
         if remaps.Length = 0 && !source.Has("remaps") && !source.Has("buttons") {
             remaps := defaults["remaps"]
         }
@@ -184,6 +190,7 @@ class ConfigManager {
         remaps.Push(remap)
     }
 
+    ; buttons 下按键嵌套触发器。摊平成一条 remap。
     ConvertLegacyButtons(buttons) {
         result := []
         legacyTriggers := Map(
@@ -261,6 +268,7 @@ class ConfigManager {
             "precisionModifier", this.NormalizeModifier(this.ReadString(source, "precisionModifier", "win"), "win"),
             "zoomModifier", this.NormalizeModifier(this.ReadString(source, "zoomModifier", "ctrl"), "ctrl")
         )
+        ; 两组修饰键相同，后者改为 none。
         used := Map()
         for name in ["horizontalModifier", "fastModifier", "precisionModifier", "zoomModifier"] {
             modifier := modifiers[name]
@@ -293,6 +301,7 @@ class ConfigManager {
         if value = "" {
             return fallback
         }
+        ; 首尾 + 或连续 ++ 视为非法。
         if SubStr(value, 1, 1) = "+" || SubStr(value, -1) = "+" || InStr(value, "++") {
             return fallback
         }
@@ -311,6 +320,7 @@ class ConfigManager {
             seen[token] := true
         }
 
+        ; 令牌顺序固定为 ctrl alt shift win mbutton xbutton1 xbutton2。
         result := ""
         for token in ["ctrl", "alt", "shift", "win", "mbutton", "xbutton1", "xbutton2"] {
             if seen.Has(token) {
@@ -340,6 +350,7 @@ class ConfigManager {
         return result
     }
 
+    ; 文件都读失败则用下列值。
     CreateBuiltInDefaults() {
         remaps := []
         this.AddDefault(&remaps, "XButton1", "click", "Back")
@@ -381,6 +392,7 @@ class ConfigManager {
     }
 
     DoubleClickInterval(speed) {
+        ; slow=400。medium=250。否则=150。
         return speed = "slow" ? 400 : speed = "medium" ? 250 : 150
     }
 
@@ -400,6 +412,7 @@ class ConfigManager {
         return source is Map && source.Has(key) && source[key] is String ? source[key] : fallback
     }
 
+    ; 仅 0、1 有效。
     ReadBoolean(source, key, fallback) {
         if !(source is Map) || !source.Has(key) {
             return fallback

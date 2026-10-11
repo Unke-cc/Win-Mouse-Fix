@@ -37,3 +37,21 @@ test-results/
 AGENTS.md
 .agents/
 .codex/
+
+# Python temporary and cache files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Office lock and temporary files
+~$*.doc*
+~$*.xls*
+~$*.ppt*
+
+# Temporary test/scratch files and scripts
+tmp/
+temp/
+tmp_*
+
+# 软著申请及衍生材料
+软著/

@@ -1,5 +1,6 @@
 #Requires AutoHotkey v2.0
 
+; 执行映射。输出按键、滚轮、快捷键。
 class ActionManager {
     Execute(action, context := 0) {
         actionType := action["type"]
@@ -9,62 +10,69 @@ class ActionManager {
             case "Original":
                 return this.SendOriginalFromContext(context)
             case "Back":
-                SendEvent("{Browser_Back}")
+                SendEvent("{Browser_Back}") ; 后退。
             case "Forward":
-                SendEvent("{Browser_Forward}")
+                SendEvent("{Browser_Forward}") ; 前进。
             case "MiddleClick":
-                SendEvent("{MButton}")
+                SendEvent("{MButton}") ; 中键。
             case "PrimaryClick":
-                SendEvent("{LButton}")
+                SendEvent("{LButton}") ; 左键。
             case "SecondaryClick":
-                SendEvent("{RButton}")
+                SendEvent("{RButton}") ; 右键。
             case "TaskView":
-                SendEvent("#{Tab}")
+                SendEvent("#{Tab}") ; Win+Tab。开任务视图。
             case "ShowDesktop":
-                SendEvent("#d")
+                SendEvent("#d") ; Win+D。显示桌面。
             case "StartMenu":
-                SendEvent("{LWin}")
+                SendEvent("{LWin}") ; 左 Win。开开始菜单。
             case "DesktopLeft":
-                this.SendDesktopSwitch("left")
+                this.SendDesktopSwitch("left") ; Ctrl+Win+Left。
             case "DesktopRight":
-                this.SendDesktopSwitch("right")
+                this.SendDesktopSwitch("right") ; Ctrl+Win+Right。
             case "AltTab":
-                SendEvent("!{Tab}")
+                SendEvent("!{Tab}") ; Alt+Tab。切换窗口。
             case "CloseWindow":
-                SendEvent("!{F4}")
+                SendEvent("!{F4}") ; Alt+F4。关闭窗口。
             case "CloseTab":
-                SendEvent("^w")
+                SendEvent("^w") ; Ctrl+W。关闭标签。
             case "NextTab":
-                SendEvent("^{Tab}")
+                SendEvent("^{Tab}") ; Ctrl+Tab。往后切标签。
             case "PreviousTab":
-                SendEvent("^+{Tab}")
+                SendEvent("^+{Tab}") ; Ctrl+Shift+Tab。往前切标签。
             case "VolumeUp":
-                SendEvent("{Volume_Up}")
+                SendEvent("{Volume_Up}") ; 音量加。
             case "VolumeDown":
-                SendEvent("{Volume_Down}")
+                SendEvent("{Volume_Down}") ; 音量减。
             case "VolumeMute":
-                SendEvent("{Volume_Mute}")
+                SendEvent("{Volume_Mute}") ; 静音。
             case "MediaPlayPause":
-                SendEvent("{Media_Play_Pause}")
+                SendEvent("{Media_Play_Pause}") ; 播放或暂停。
             case "FastScroll":
                 if !(context is Map) || !context.Has("wheelDirection") {
                     return false
                 }
+                ; 一次滚 4 格。
                 this.SendWheel(context["wheelDirection"], 4)
             case "Zoom":
                 if !(context is Map) || !context.Has("wheelDirection") {
                     return false
                 }
+                ; 下：Ctrl+WheelDown。上：Ctrl+WheelUp。
                 SendEvent(context["wheelDirection"] = "down" ? "^{WheelDown}" : "^{WheelUp}")
             case "VolumeControl":
+                ; 上：音量加。下：音量减。
                 return this.ExecuteWheelPair("VolumeUp", "VolumeDown", context)
             case "TabNavigation":
+                ; 上：Ctrl+Shift+Tab。下：Ctrl+Tab。
                 return this.ExecuteWheelPair("PreviousTab", "NextTab", context)
             case "BrowserNavigation":
+                ; 上：后退。下：前进。
                 return this.ExecuteWheelPair("Back", "Forward", context)
             case "DesktopSwitch":
+                ; 上：Ctrl+Win+Left。下：Ctrl+Win+Right。
                 return this.ExecuteWheelPair("DesktopLeft", "DesktopRight", context)
             case "DesktopStartMenu":
+                ; 上：Win+D。下：左 Win。
                 return this.ExecuteWheelPair("ShowDesktop", "StartMenu", context)
             case "ScrollMove":
                 return this.ScrollFromDrag(context)
@@ -84,6 +92,7 @@ class ActionManager {
         return true
     }
 
+    ; 上滚用前者。下滚用后者。
     ExecuteWheelPair(upActionType, downActionType, context) {
         if !(context is Map) || !context.Has("wheelDirection") {
             return false
@@ -92,6 +101,8 @@ class ActionManager {
         return this.Execute(Map("type", actionType, "shortcut", ""), context)
     }
 
+    ; 位移满 8 像素，滚一格。
+    ; 鼠标右移发 WheelLeft。下移发 WheelDown。
     ScrollFromDrag(context) {
         if !(context is Map) || !context.Has("deltaX") || !context.Has("deltaY") {
             return false
@@ -109,6 +120,7 @@ class ActionManager {
         return horizontalSteps > 0 || verticalSteps > 0
     }
 
+    ; 左右拖会反向切桌面。上拖开任务视图。下拖显桌面。
     NavigateFromDrag(context) {
         if !(context is Map) || !context.Has("dragDirection") {
             return false
@@ -132,30 +144,33 @@ class ActionManager {
         }
         switch context["dragDirection"] {
             case "up":
-                actionType := "PreviousTab"
+                actionType := "PreviousTab" ; Ctrl+Shift+Tab。
             case "down":
-                actionType := "NextTab"
+                actionType := "NextTab" ; Ctrl+Tab。
             case "left":
-                actionType := "Back"
+                actionType := "Back" ; 后退。
             case "right":
-                actionType := "Forward"
+                actionType := "Forward" ; 前进。
             default:
                 return false
         }
         return this.Execute(Map("type", actionType, "shortcut", ""), context)
     }
 
+    ; followMouse 时左右对调。上为 Win+Tab。下为 Win+D。
     DesktopNavigationShortcut(dragDirection, swipeDirection := "followMouse") {
         followMouse := swipeDirection != "oppositeMouse"
         switch dragDirection {
             case "left":
+                ; followMouse：Ctrl+Win+Right。oppositeMouse：Ctrl+Win+Left。
                 return followMouse ? "^#{Right}" : "^#{Left}"
             case "right":
+                ; followMouse：Ctrl+Win+Left。oppositeMouse：Ctrl+Win+Right。
                 return followMouse ? "^#{Left}" : "^#{Right}"
             case "up":
-                return "#{Tab}"
+                return "#{Tab}" ; Win+Tab。
             case "down":
-                return "#d"
+                return "#d" ; Win+D。
             default:
                 return ""
         }
@@ -173,6 +188,7 @@ class ActionManager {
             return false
         }
         clickCount := context.Has("clickCount") ? context["clickCount"] : 1
+        ; Blind 保留修饰键。
         loop Max(1, clickCount) {
             SendEvent("{Blind}{" context["button"] "}")
         }
@@ -187,6 +203,7 @@ class ActionManager {
         SendEvent("{Blind}{" button " up}")
     }
 
+    ; preserveModifiers 为假时去掉 Blind，避免 Alt/Win 改写滚轮。
     SendWheel(direction, count := 1, preserveModifiers := true) {
         wheelKey := direction = "down" ? "WheelDown" : "WheelUp"
         prefix := preserveModifiers ? "{Blind}" : ""
@@ -202,12 +219,15 @@ class ActionManager {
         SendInput(this.DesktopSwitchShortcut(direction))
     }
 
+    ; 向右：Ctrl+Win+Right。向左：Ctrl+Win+Left。
     DesktopSwitchShortcut(direction) => direction = "right" ? "^#{Right}" : "^#{Left}"
 
     ReleaseAll() {
-        ; MVP actions use complete key presses and therefore keep no synthetic key held.
+        ; 按键一次发完。不保持按下状态。
     }
 
+    ; 已含 ^ ! # { } 则视为 AHK 语法。
+    ; 否则 Ctrl Alt Shift Win 转成 ^ ! + #。
     ToAutoHotkeyShortcut(shortcut) {
         shortcut := Trim(shortcut)
         if shortcut = "" {
