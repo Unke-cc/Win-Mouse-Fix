@@ -1,72 +1,60 @@
 # Win Mouse Fix 技术选择
 
-适用版本：`0.1.5`。本文记录当前实际采用的组成和仍未实现的技术方向。
+适用版本：`0.1.7`。本文记录当前实际采用的组成和仍未实现的方向。
 
 ## 1. 已确定的技术方案
 
-Win Mouse Fix 只面向 Windows，以 **AutoHotkey v2** 作为固定的鼠标核心，以 **.NET Framework 4.8 + WPF** 构建 GUI。GUI 将复杂的鼠标脚本能力转换为开关、选项、滑块和表单；AutoHotkey v2 负责按键、滚轮、组合动作、活动应用识别及应用规则。
+Win Mouse Fix 只面向 Windows。鼠标核心固定为 **AutoHotkey v2**，设置窗口为 **.NET Framework 4.8 + WPF**，托盘为独立的 **.NET Framework 4.8 + Windows Forms** 进程。
 
 | 部分 | 技术 | 用途 |
 | --- | --- | --- |
-| GUI | .NET Framework 4.8 + WPF | 设置窗口、状态提示和配置管理 |
-| 常驻控制 | .NET Framework 4.8 + Windows Forms `NotifyIcon` | 独立进程保留托盘和核心进程控制 |
-| 页面状态 | WPF 数据绑定 | 页面状态和界面更新 |
-| 配置 | System.Text.Json | 读取、检查和写入 JSON 配置 |
-| 设置生效 | JSON 文件监听 | GUI 保存配置后，核心在 250 毫秒内检查并读取 |
-| 配置管理 | ProfileService + JSON 文件 | 管理多套配置、导入、导出、备份和恢复 |
-| 更新检查 | HttpClient | GitHub 优先，失败后改查 Gitee；支持正式版和 Beta 版 |
-| 后续进程通信 | NamedPipeClientStream | 当前未实现，保留为状态确认方向 |
-| 鼠标核心 | AutoHotkey v2 | 执行全部鼠标行为和应用规则 |
-| 核心打包 | Ahk2Exe | 将脚本与 AutoHotkey v2 运行环境打包 |
-| 整体安装 | Inno Setup | 生成安装版，处理快捷方式、开机运行和卸载 |
-| 单实例 | `Mutex` + `EventWaitHandle` | 阻止重复窗口和核心，并让普通重复启动显示已有窗口 |
+| 设置窗口 | .NET Framework 4.8 + WPF | 四个设置页、HUD、配置管理 |
+| 常驻控制 | WinForms `NotifyIcon` | 托盘、核心进程、登录后 `--background` |
+| 页面状态 | WPF 数据绑定 | 界面更新 |
+| 配置 | System.Text.Json | `%AppData%\WinMouseFix\config.json` |
+| 设置生效 | JSON 文件监听 | GUI 保存后核心 250 ms 内检查 |
+| 配置管理 | ProfileService + JSON | 多套配置、导入导出、备份恢复 |
+| 更新检查 | HttpClient | GitHub 优先，失败改查 Gitee |
+| 内存 | `MemoryService.TrimWorkingSet()` | 隐藏设置窗口或进托盘时修剪工作集 |
+| 后续 IPC | NamedPipeClientStream | 未实现 |
+| 鼠标核心 | AutoHotkey v2 | 手势、滚轮模式、应用规则 |
+| 核心打包 | Ahk2Exe | 脚本与运行环境一并打包 |
+| 安装 | Inno Setup | 当前用户安装、快捷方式、卸载 |
+| 单实例 | `Mutex` + `EventWaitHandle` | 阻止重复窗口和核心 |
 
 ## 2. GUI 方案比较
 
 | 方案 | 优点 | 不足 | 结论 |
 | --- | --- | --- | --- |
-| .NET Framework 4.8 + WPF | Windows 10 22H2 和 Windows 11 已包含所需框架，发布文件较小；便于管理托盘、进程和安装包 | 默认样式较传统，需要自定义控件外观 | 采用 |
-| WinUI 3 | Windows 11 风格自然 | 托盘、打包和部分窗口行为更复杂 | 暂不采用 |
-| Tauri 2 | 页面样式和动画自由 | 同时引入 Web、Rust 和 WebView2，组成更复杂 | 暂不采用 |
-| Electron | 页面开发方便，相关资料丰富 | 安装体积和运行占用较大 | 不采用 |
+| .NET Framework 4.8 + WPF | Win10 22H2 / Win11 已带运行库，体积小 | 默认样式传统，需自绘 | 采用 |
+| WinUI 3 | 更接近 Windows 11 | 托盘与打包更复杂 | 不采用 |
+| Tauri 2 / Electron | 页面样式自由 | 体积和组成更重 | 不采用 |
 
 ## 3. GUI 与鼠标核心的关系
 
-GUI 是配置的唯一写入者，用户配置保存在 `%AppData%\WinMouseFix\config.json`。AutoHotkey v2 只读取、检查并执行配置，不直接改写用户设置。
+GUI 是配置的唯一写入者。核心只读取并执行，不改用户设置。登录运行命令是 `WinMouseFix.Tray.exe --background`。
 
-GUI 使用当前用户会话中的 `Mutex` 保证单实例，并用 `EventWaitHandle` 通知已有实例显示设置窗口。`--background` 用于登录后静默进入托盘；重复的后台启动直接结束，不主动显示窗口。
+滚轮：`takeOverWheel=false` 时不注册全局滚轮热键，仅在已映射的中键/侧键按下时临时挂滚轮，用于按钮页手势。平滑/惯性才常驻接管垂直滚轮速度。核心不再用键盘修饰键拦截普通滚动，也不再按滚轮频率猜测触控板。
 
-当前版本中，GUI 保存 JSON 配置，AutoHotkey v2 核心监听文件变化并自动读取。这个方式能够让普通设置生效，但尚未提供完整的进程状态确认。
-
-GUI 在 `%AppData%\WinMouseFix` 中管理当前配置、多套配置档案和备份。切换、导入或恢复后仍写入固定的 `config.json`，因此 AutoHotkey v2 核心不需要理解配置档案名称。
-
-Windows Named Pipes 尚未加入。后续如果实现，消息可用于应用配置、暂停、恢复、读取状态和重新启动核心，并让 GUI 获得明确的结果确认。
-
-普通选项应即时生效；滑块和连续修改使用 GUI 当前的延迟保存机制，减少重复写入。新配置无法使用时，核心继续使用上一份有效配置；只有无法直接更新的设置才重新启动 AutoHotkey v2 核心，GUI 始终保持打开。
+Named Pipes 未加入。滑块使用 GUI 现有延迟保存。无效配置时核心沿用上一份有效配置。
 
 ## 4. 系统与发布体积
 
-- 正式支持 Windows 11 x64，兼容 Windows 10 22H2 x64；暂不提供 ARM64 和 32 位版本。
-- 安装程序检查 .NET Framework 4.8，AutoHotkey v2 随鼠标核心打包。
-- 安装到 `%LocalAppData%\Programs\Win Mouse Fix`，不要求管理员权限；开始菜单入口默认创建，桌面快捷方式由用户选择。
-- 固定 `AppId` 支持直接更新；安装和卸载保留 `%AppData%\WinMouseFix`，卸载删除登录运行登记。
-- `dist/app` 中 GUI 主程序及其依赖合计不得超过 10 MiB；`WinMouseFix.Engine.exe` 和 `config/` 不计入 GUI 数值。界面图标已嵌入 GUI，不在发布目录重复保存。
-- 不使用 self-contained、PublishTrimmed、NativeAOT 或 ReadyToRun；这些方式不适合当前 WPF 目标，或会明显增加发布体积。
+- Windows 11 x64 正式支持，Windows 10 22H2 x64 兼容；无 ARM64 / 32 位。
+- 安装检查 .NET Framework 4.8；AHK 打进核心。
+- 默认 `%LocalAppData%\Programs\Win Mouse Fix`，不要求管理员。
+- 固定 `AppId`；卸载删登录运行登记，保留用户配置目录。
+- `dist/app` 中 GUI+托盘主程序及依赖不超过 10 MiB；核心和 `config/` 不计。
+- 不使用 self-contained、PublishTrimmed、NativeAOT、ReadyToRun。
 
 ## 5. 最小验证清单
 
-- 运行 WPF GUI 与打包后的 AutoHotkey v2 核心，确认核心能够读取 GUI 保存的配置。
-- 在 GUI 中修改一个侧键动作，确认配置写入、核心自动读取和鼠标行为即时变化。
-- 修改滚轮参数并连续拖动滑块，确认最终数值生效且没有明显卡顿。
-- 在滚动页录入单个或多个 Ctrl、Alt、Shift、Win，确认组合顺序规范、普通键被拒绝、重复组合被关闭。
-- 使用 Alt 或 Win 快速/精确滚动，确认页面收到普通滚轮；使用 Ctrl 缩放时确认仍保留 Ctrl 组合。
-- 关闭滚动接管后使用触摸板连续滑动页面，确认保持 Windows 原生滚动；开启接管后再使用实体鼠标滚轮和按住滚动。
-- 让 GitHub 更新请求失败，确认程序自动改查 Gitee；开启 Beta 更新后确认可读取预发布版本。
-- 写入无效配置，确认核心回到默认配置且保持运行。
-- 修改必须重新初始化的设置，确认只重启鼠标核心，GUI 页面、窗口位置和未保存表单不丢失。
-- 关闭设置窗口后确认核心继续运行；重新打开 GUI 后确认状态和配置一致。
-- 连续普通启动两次，确认第二次结束且已有窗口显示到前台；重复 `--background` 启动不显示窗口。
-- 使用 Ahk2Exe 与 Inno Setup 生成安装包，在未单独安装 AutoHotkey 的 Windows 环境中验证安装、运行和卸载。
-- 分别在 Windows 10 22H2 x64 和 Windows 11 x64 检查启动、托盘、配置保存和卸载。
-- 检查开始菜单入口、直接更新、卸载后配置保留以及登录运行登记删除。
-- 运行构建脚本后，确认其报告的 GUI 总量不超过 10 MiB。
+- 改一侧键动作后，JSON 写入、核心读取、行为变化。
+- 原生 / 平滑 / 惯性三模式切换后手感符合选择；原生下触控板不被加速或截流。
+- 按住侧键滚动执行按钮页手势，不经过惯性尾巴。
+- 左键、右键无法录入手势。
+- 无映射键按下时位移定时器不空转。
+- GitHub 失败改查 Gitee。
+- 无效配置时核心不退出。
+- 重复普通启动只前置窗口；重复 `--background` 不弹窗。
+- `validate.ps1`、`package.ps1` 成功；GUI+托盘体积不超过 10 MiB。

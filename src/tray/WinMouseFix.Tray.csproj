@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net48</TargetFramework>
@@ -11,10 +11,10 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AssemblyName>WinMouseFix.Tray</AssemblyName>
     <RootNamespace>WinMouseFix.Tray</RootNamespace>
-    <Version>0.1.5</Version>
-    <AssemblyVersion>0.1.5.0</AssemblyVersion>
-    <FileVersion>0.1.5.0</FileVersion>
-    <InformationalVersion>0.1.5</InformationalVersion>
+    <Version>0.1.7</Version>
+    <AssemblyVersion>0.1.7.0</AssemblyVersion>
+    <FileVersion>0.1.7.0</FileVersion>
+    <InformationalVersion>0.1.7</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <Product>Win Mouse Fix</Product>
     <Company>Hu Wenkai</Company>
@@ -25,6 +25,7 @@
     <PackageReference Include="System.Text.Json" Version="8.0.5" />
     <Compile Include="../shared/RuntimeNames.cs" Link="RuntimeNames.cs" />
     <Compile Include="../shared/RuntimeLauncher.cs" Link="RuntimeLauncher.cs" />
+    <Compile Include="../shared/MemoryService.cs" Link="MemoryService.cs" />
     <Compile Include="../gui/Services/CoreProcessService.cs" Link="Services/CoreProcessService.cs" />
     <Compile Include="../gui/Services/ConfigurationService.cs" Link="Services/ConfigurationService.cs" />
     <Compile Include="../gui/Services/ProfileService.cs" Link="Services/ProfileService.cs" />

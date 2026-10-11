@@ -53,6 +53,6 @@
   },
   "excludedApps": [],
   "startup": {
-    "runAtLogin": false
+    "runAtLogin": true
   }
 }

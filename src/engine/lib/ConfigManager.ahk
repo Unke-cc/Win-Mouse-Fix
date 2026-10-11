@@ -153,7 +153,7 @@ class ConfigManager {
             "remaps", this.NormalizeRemaps(remaps),
             "scroll", this.NormalizeScroll(this.ReadMap(source, "scroll", defaults["scroll"])),
             "excludedApps", this.NormalizeExcludedApps(this.ReadArray(source, "excludedApps", [])),
-            "startup", Map("runAtLogin", this.ReadBoolean(this.ReadMap(source, "startup", Map()), "runAtLogin", false)),
+            "startup", Map("runAtLogin", this.ReadBoolean(this.ReadMap(source, "startup", Map()), "runAtLogin", true)),
             "timing", Map(
                 "multiClickMs", this.DoubleClickInterval(speed),
                 "holdMs", this.ReadInteger(timingSource, "holdMs", 500, 200, 2000),
@@ -378,7 +378,7 @@ class ConfigManager {
                 "zoomModifier", "ctrl"
             ),
             "excludedApps", [],
-            "startup", Map("runAtLogin", false),
+            "startup", Map("runAtLogin", true),
             "timing", Map("multiClickMs", 150, "holdMs", 500, "dragThresholdPx", 12)
         )
     }

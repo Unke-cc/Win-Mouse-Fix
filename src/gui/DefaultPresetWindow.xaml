@@ -1,63 +1,103 @@
-<Window x:Class="WinMouseFix.Gui.DefaultPresetWindow"
+﻿<Window x:Class="WinMouseFix.Gui.DefaultPresetWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="恢复默认值" Width="520" SizeToContent="Height"
+        Title="恢复默认值" Width="450" SizeToContent="Height"
         ResizeMode="NoResize" ShowInTaskbar="False"
         WindowStartupLocation="CenterOwner">
-    <Grid Margin="28">
+    <Grid Margin="20,18,20,18">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <StackPanel Margin="0,0,0,20">
-            <TextBlock Text="恢复默认值" Style="{StaticResource PageTitle}" />
+        <StackPanel Margin="0,0,0,16">
+            <TextBlock Text="恢复默认值" Style="{StaticResource PageTitle}" FontSize="16" />
             <TextBlock Text="选择适合鼠标类型的默认按键设置。当前设置会被替换。"
-                       Foreground="{StaticResource MutedTextBrush}" />
+                       Foreground="{StaticResource MutedTextBrush}" FontSize="11.5" />
         </StackPanel>
 
         <StackPanel Grid.Row="1">
             <Button x:Name="ThreeButtonPresetButton" Click="ThreeButtonPreset_Click"
-                    HorizontalContentAlignment="Stretch" Margin="0,0,0,12" Padding="18,14">
+                    HorizontalContentAlignment="Stretch" Margin="0,0,0,10" Padding="14,12"
+                    Background="White" BorderBrush="#E3E3E3" BorderThickness="1" Cursor="Hand">
+                <Button.Template>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="CardBorder" Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="8" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="CardBorder" Property="Background" Value="#F8F9FA" />
+                                <Setter TargetName="CardBorder" Property="BorderBrush" Value="#D0D3D9" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="CardBorder" Property="Background" Value="#EEF0F3" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Button.Template>
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <StackPanel>
-                        <TextBlock Text="三键鼠标" FontSize="16" FontWeight="SemiBold" />
+                        <TextBlock Text="三键鼠标" FontSize="13.5" FontWeight="SemiBold" />
                         <TextBlock Text="中键：点击中键、长按显示桌面、连按开始菜单、拖动切换虚拟桌面"
-                                   Foreground="{StaticResource MutedTextBrush}" Margin="0,4,12,0"
-                                   TextWrapping="Wrap" />
+                                   Foreground="{StaticResource MutedTextBrush}" Margin="0,4,8,0"
+                                   FontSize="11.5" TextWrapping="Wrap" />
                     </StackPanel>
                     <TextBlock x:Name="ThreeButtonRecommendedText" Grid.Column="1" Text="推荐"
-                               Foreground="{StaticResource PrimaryBrush}" FontWeight="SemiBold"
+                               Foreground="#007AFF" FontWeight="SemiBold" FontSize="11"
                                VerticalAlignment="Center" Visibility="Collapsed" />
                 </Grid>
             </Button>
 
             <Button x:Name="FiveOrMorePresetButton" Click="FiveOrMorePreset_Click"
-                    HorizontalContentAlignment="Stretch" Padding="18,14">
+                    HorizontalContentAlignment="Stretch" Padding="14,12"
+                    Background="White" BorderBrush="#E3E3E3" BorderThickness="1" Cursor="Hand">
+                <Button.Template>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="CardBorder" Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="8" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="CardBorder" Property="Background" Value="#F8F9FA" />
+                                <Setter TargetName="CardBorder" Property="BorderBrush" Value="#D0D3D9" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="CardBorder" Property="Background" Value="#EEF0F3" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Button.Template>
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <StackPanel>
-                        <TextBlock Text="五键或多键鼠标" FontSize="16" FontWeight="SemiBold" />
+                        <TextBlock Text="五键或多键鼠标" FontSize="13.5" FontWeight="SemiBold" />
                         <TextBlock Text="按键 4：后退、桌面与开始菜单、虚拟桌面与任务视图&#10;按键 5：前进、缩放、滚动与移动"
-                                   Foreground="{StaticResource MutedTextBrush}" Margin="0,4,12,0"
-                                   TextWrapping="Wrap" />
+                                   Foreground="{StaticResource MutedTextBrush}" Margin="0,4,8,0"
+                                   FontSize="11.5" TextWrapping="Wrap" />
                     </StackPanel>
                     <TextBlock x:Name="FiveOrMoreRecommendedText" Grid.Column="1" Text="推荐"
-                               Foreground="{StaticResource PrimaryBrush}" FontWeight="SemiBold"
+                               Foreground="#007AFF" FontWeight="SemiBold" FontSize="11"
                                VerticalAlignment="Center" Visibility="Collapsed" />
                 </Grid>
             </Button>
         </StackPanel>
 
-        <Button Grid.Row="2" Content="取消" HorizontalAlignment="Right" Margin="0,18,0,0"
-                MinWidth="88" IsCancel="True" Click="Cancel_Click" />
+        <Button Grid.Row="2" Content="取消" HorizontalAlignment="Right" Margin="0,16,0,0"
+                MinWidth="78" Height="28" IsCancel="True" Click="Cancel_Click" />
     </Grid>
 </Window>

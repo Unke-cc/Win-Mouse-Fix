@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using WinMouseFix.Gui.Services;
 
 namespace WinMouseFix.Gui;
@@ -9,14 +9,10 @@ public partial class DefaultPresetWindow : Window
     {
         InitializeComponent();
 
-        var recommendedText = detectedType == MouseDeviceType.ThreeButton
-            ? ThreeButtonRecommendedText
-            : FiveOrMoreRecommendedText;
         var recommendedButton = detectedType == MouseDeviceType.ThreeButton
             ? ThreeButtonPresetButton
             : FiveOrMorePresetButton;
 
-        recommendedText.Visibility = Visibility.Visible;
         recommendedButton.IsDefault = true;
     }
 

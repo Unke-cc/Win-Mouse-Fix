@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Controls;
 using WinMouseFix.Gui.Models;
 
@@ -42,4 +42,6 @@ public sealed class DoubleClickSpeedOption
 
     public string Value { get; }
     public string Name { get; }
+
+    public override string ToString() => Name;
 }

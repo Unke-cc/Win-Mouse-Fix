@@ -1,3 +1,4 @@
+﻿using WinMouseFix.Shared;
 using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -23,11 +24,47 @@ public partial class MainWindow : Window
     private readonly ProfileService profileService;
     private readonly MouseDeviceService mouseDeviceService = new();
     private readonly StartupService startupService = new();
+    [System.Runtime.InteropServices.DllImport("dwmapi.dll")]
+    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
+
+    private const int DWMWA_WINDOW_CORNER_PREFERENCE = 33;
+    private const int DWMWCP_ROUND = 2;
+
+    protected override void OnSourceInitialized(EventArgs e)
+    {
+        base.OnSourceInitialized(e);
+        ApplyWindows11Style();
+    }
+
+    private void ApplyWindows11Style()
+    {
+        if (Environment.OSVersion.Version.Build < 22000)
+        {
+            return;
+        }
+
+        try
+        {
+            var hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+            if (hwnd != IntPtr.Zero)
+            {
+                var cornerPreference = DWMWCP_ROUND;
+                DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, ref cornerPreference, sizeof(int));
+            }
+        }
+        catch
+        {
+        }
+    }
+
+    private bool isUpdatingScrollMode;
     private readonly UpdateService updateService = new();
     private readonly DispatcherTimer saveTimer;
     private readonly DispatcherTimer statusTimer;
     private readonly DispatcherTimer captureClickTimer;
     private readonly DispatcherTimer captureHoldTimer;
+    private readonly DispatcherTimer capturePulseResetTimer = new() { Interval = TimeSpan.FromMilliseconds(1500) };
+    private int resizeVersion;
     private readonly DispatcherTimer coreStatusTimer;
     private readonly SemaphoreSlim saveLock = new(1, 1);
     private AppConfig config = new();
@@ -48,7 +85,6 @@ public partial class MainWindow : Window
     private RemapConfig? provisionalGestureRemap;
     private System.Windows.Point captureOrigin;
     private FrameworkElement? activePage;
-    private int resizeVersion;
     private bool centerWindowAfterInitialResize = true;
     private UpdateSource? aboutSource;
     private bool aboutSourceResolved;
@@ -68,7 +104,7 @@ public partial class MainWindow : Window
         saveTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
         saveTimer.Tick += SaveTimer_Tick;
 
-        statusTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(4) };
+        statusTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(2000) };
         statusTimer.Tick += StatusTimer_Tick;
 
         captureClickTimer = new DispatcherTimer();
@@ -76,6 +112,11 @@ public partial class MainWindow : Window
 
         captureHoldTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
         captureHoldTimer.Tick += CaptureHoldTimer_Tick;
+        capturePulseResetTimer.Tick += (_, _) =>
+        {
+            capturePulseResetTimer.Stop();
+            CapturePlusIcon.Foreground = new SolidColorBrush(Color.FromRgb(0x8E, 0x95, 0xA2));
+        };
 
         coreStatusTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
         coreStatusTimer.Tick += CoreStatusTimer_Tick;
@@ -110,6 +151,7 @@ public partial class MainWindow : Window
         lastSavedConfig = CloneConfig(config);
         DataContext = config;
         SubscribeToConfig(config);
+        UpdateScrollModeRadios();
         ConfigPathText.Text = configurationService.ConfigPath;
         AboutVersionText.Text = $"版本 {GetCurrentReleaseVersion()}";
         loading = false;
@@ -125,14 +167,17 @@ public partial class MainWindow : Window
             ShowStatus(defaultMessage);
         }
 
-        GeneralNavigation.IsChecked = true;
+        ButtonsNavigation.IsChecked = true;
         UpdateApplicationEmptyState();
         UpdateRemapEmptyState();
         RefreshModifierDisplays();
         UpdateCoreStatus();
         coreStatusTimer.Start();
 
-        var startupResult = startupService.SetRunAtLogin(config.Startup.RunAtLogin);
+        // 固定开机运行与全屏自动暂停为启用
+        config.Startup.RunAtLogin = true;
+        config.PauseInFullscreen = true;
+        var startupResult = startupService.SetRunAtLogin(true);
         if (!startupResult.Applied)
         {
             ShowStatus(startupResult.Message);
@@ -150,6 +195,7 @@ public partial class MainWindow : Window
             ShowActivated = true;
             ShowInTaskbar = true;
             WindowHiddenToTray?.Invoke(this, EventArgs.Empty);
+        MemoryService.TrimWorkingSet();
         }
     }
 
@@ -315,7 +361,18 @@ public partial class MainWindow : Window
     private void StatusTimer_Tick(object? sender, EventArgs e)
     {
         statusTimer.Stop();
-        StatusBar.Visibility = Visibility.Collapsed;
+        var fadeOut = new DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(180))
+        {
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn }
+        };
+        fadeOut.Completed += (_, _) =>
+        {
+            if (!statusTimer.IsEnabled)
+            {
+                StatusHud.Visibility = Visibility.Collapsed;
+            }
+        };
+        StatusHud.BeginAnimation(OpacityProperty, fadeOut);
     }
 
     private static AppConfig CloneConfig(AppConfig source)
@@ -348,11 +405,15 @@ public partial class MainWindow : Window
         lastSavedConfig = CloneConfig(config);
         DataContext = config;
         SubscribeToConfig(config);
+        UpdateScrollModeRadios();
         loading = false;
         UpdateApplicationEmptyState();
         UpdateRemapEmptyState();
 
-        startupService.SetRunAtLogin(config.Startup.RunAtLogin);
+        // 固定开机运行与全屏自动暂停为启用
+        config.Startup.RunAtLogin = true;
+        config.PauseInFullscreen = true;
+        startupService.SetRunAtLogin(true);
         if (config.Enabled != coreProcessService.IsRunning)
         {
             SetAppEnabled(config.Enabled, showMessage: false);
@@ -376,6 +437,16 @@ public partial class MainWindow : Window
         activePage = sender == GeneralNavigation ? GeneralPage :
             sender == ButtonsNavigation ? ButtonsPage :
             sender == ScrollNavigation ? ScrollPage : AboutPage;
+
+        if (activePage != null)
+        {
+            var fadeIn = new DoubleAnimation(0.5, 1.0, TimeSpan.FromMilliseconds(120))
+            {
+                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+            };
+            activePage.BeginAnimation(OpacityProperty, fadeIn);
+        }
+
         Dispatcher.BeginInvoke(ResizeWindowForActivePage, DispatcherPriority.Loaded);
         if (sender == AboutNavigation)
         {
@@ -383,6 +454,18 @@ public partial class MainWindow : Window
         }
     }
 
+    /// <summary>
+    /// 根据当前活动页面动态自适应窗口宽度与高度，实现通用页小巧精致、手势按键页舒展完整的响应式布局
+    /// </summary>
+        /// <summary>
+    /// 根据当前活动页面动态自适应窗口宽度与高度，实现通用页小巧精致、手势与滚动页宽屏舒展的居中平滑伸缩
+    /// </summary>
+        /// <summary>
+    /// 根据当前活动页面自适应窗口尺寸：按键页为 580 宽画幅；通用、滚动、关于三页固定为统一的 480 紧凑无滚动条卡片
+    /// </summary>
+        /// <summary>
+    /// 所有页面统一以 480 为标准固定窗口宽度，左上角固定吸附，仅对高度执行平滑单向展开/收缩动画
+    /// </summary>
     private void ResizeWindowForActivePage()
     {
         if (activePage is null || WindowState != WindowState.Normal || !IsLoaded)
@@ -393,58 +476,64 @@ public partial class MainWindow : Window
         var measuredContent = activePage is System.Windows.Controls.ScrollViewer { Content: FrameworkElement content }
             ? content
             : activePage;
-        if (activePage == ButtonsPage)
-        {
-            MappingsPanel.MinHeight = 420;
-        }
 
-        measuredContent.Measure(new System.Windows.Size(Math.Max(1, ContentHost.ActualWidth), double.PositiveInfinity));
+
+        // 所有页面的内容宽度严格统一为 440，窗口宽度严格统一为 480
+        const double standardContentWidth = 440.0;
+        var frameWidth = Math.Max(0, ActualWidth - RootLayout.ActualWidth);
+        var targetWidth = standardContentWidth + 40 + frameWidth;
+        var workArea = SystemParameters.WorkArea;
+        targetWidth = Clamp(targetWidth, MinWidth, Math.Max(MinWidth, workArea.Width - 32));
+
+        // 测算内容展开所需的自然高度，确保无滚动条完整展示
+        measuredContent.Measure(new System.Windows.Size(standardContentWidth, double.PositiveInfinity));
 
         var frameHeight = Math.Max(0, ActualHeight - RootLayout.ActualHeight);
-        var targetHeight = 68 + measuredContent.DesiredSize.Height + frameHeight;
-        var workArea = SystemParameters.WorkArea;
+        var targetHeight = 54 + measuredContent.DesiredSize.Height + frameHeight + (activePage == ButtonsPage ? 8 : 0);
         var safeTop = workArea.Top + 16;
         var safeBottom = workArea.Bottom - 16;
+        var safeLeft = workArea.Left + 16;
+        var safeRight = workArea.Right - 16;
         var centerAfterResize = centerWindowAfterInitialResize;
         centerWindowAfterInitialResize = false;
+
         var maxHeight = activePage == ButtonsPage || centerAfterResize
             ? Math.Max(MinHeight, safeBottom - safeTop)
             : Math.Max(MinHeight, safeBottom - Top);
-        if (activePage == ButtonsPage && targetHeight > maxHeight)
-        {
-            MappingsPanel.MinHeight = Math.Max(160, 420 - (targetHeight - maxHeight));
-            measuredContent.Measure(new System.Windows.Size(Math.Max(1, ContentHost.ActualWidth), double.PositiveInfinity));
-            targetHeight = 68 + measuredContent.DesiredSize.Height + frameHeight;
-        }
+
 
         targetHeight = Clamp(targetHeight, MinHeight, maxHeight);
-        var targetTop = centerAfterResize
-            ? Clamp(workArea.Top + (workArea.Height - targetHeight) / 2,
-                safeTop,
-                Math.Max(safeTop, safeBottom - targetHeight))
-            : Top;
-        if (!centerAfterResize && activePage == ButtonsPage)
-        {
-            targetTop = Clamp(Top, safeTop, Math.Max(safeTop, safeBottom - targetHeight));
-        }
 
-        var version = ++resizeVersion;
-        if (Math.Abs(targetHeight - ActualHeight) < 2 && Math.Abs(targetTop - Top) < 2)
+        // 首次启动全屏居中；后续切换 Tab 时左上角固定吸附（Left 和 Top 恒定不动！）
+        if (centerAfterResize)
         {
-            BeginAnimation(HeightProperty, null);
-            BeginAnimation(TopProperty, null);
+            var initialLeft = Clamp(workArea.Left + (workArea.Width - targetWidth) / 2.0, safeLeft, Math.Max(safeLeft, safeRight - targetWidth));
+            var initialTop = Clamp(workArea.Top + (workArea.Height - targetHeight) / 2.0, safeTop, Math.Max(safeTop, safeBottom - targetHeight));
+            Left = initialLeft;
+            Top = initialTop;
+            Width = targetWidth;
             Height = targetHeight;
-            Top = targetTop;
             return;
         }
 
-        var duration = TimeSpan.FromMilliseconds(180);
+        // 宽度恒定保持 480，彻底消灭任何横向跳跃与晃动
+        if (Math.Abs(Width - targetWidth) > 1)
+        {
+            Width = targetWidth;
+        }
+
+        // 仅对高度执行 220ms 平滑缓动展开/收缩动画（从左上角自然向下延展）
+        var version = ++resizeVersion;
+        if (Math.Abs(targetHeight - ActualHeight) < 2)
+        {
+            BeginAnimation(HeightProperty, null);
+            Height = targetHeight;
+            return;
+        }
+
+        var duration = TimeSpan.FromMilliseconds(220);
         var easing = new CubicEase { EasingMode = EasingMode.EaseOut };
         var heightAnimation = new DoubleAnimation(ActualHeight, targetHeight, duration)
-        {
-            EasingFunction = easing
-        };
-        var topAnimation = new DoubleAnimation(Top, targetTop, duration)
         {
             EasingFunction = easing
         };
@@ -454,13 +543,10 @@ public partial class MainWindow : Window
             {
                 return;
             }
-
             BeginAnimation(HeightProperty, null);
-            BeginAnimation(TopProperty, null);
             Height = targetHeight;
-            Top = targetTop;
         };
-        BeginAnimation(TopProperty, topAnimation, HandoffBehavior.SnapshotAndReplace);
+
         BeginAnimation(HeightProperty, heightAnimation, HandoffBehavior.SnapshotAndReplace);
     }
 
@@ -517,20 +603,28 @@ public partial class MainWindow : Window
         }
     }
 
+    private void PulseCapturePlusIcon()
+    {
+        CapturePlusIcon.Foreground = new SolidColorBrush(Color.FromRgb(0x00, 0x7A, 0xFF));
+        capturePulseResetTimer.Stop();
+        capturePulseResetTimer.Start();
+    }
+
     private void CaptureArea_MouseEnter(object sender, System.Windows.Input.MouseEventArgs e)
     {
         pointerInCaptureArea = true;
         coreProcessService.Pause();
-        if (capturedButton is null)
-        {
-            CaptureStateText.Text = "正在录入鼠标操作";
-        }
+        CaptureArea.BorderBrush = new SolidColorBrush(Color.FromRgb(0xD0, 0xD3, 0xD9));
+        CaptureTransform.Y = -1;
+        CaptureGlowEffect.Opacity = 0.22;
     }
 
     private void CaptureArea_MouseLeave(object sender, System.Windows.Input.MouseEventArgs e)
     {
         pointerInCaptureArea = false;
-        CaptureStateText.Text = capturedButton is null ? "鼠标移入这里即可录入" : "松开按钮以完成录入";
+        CaptureArea.BorderBrush = new SolidColorBrush(Color.FromRgb(0xE3, 0xE3, 0xE3));
+        CaptureTransform.Y = 0;
+        CaptureGlowEffect.Opacity = 0;
         if (capturedButton is null)
         {
             coreProcessService.Resume();
@@ -570,6 +664,7 @@ public partial class MainWindow : Window
         provisionalHoldRemap = null;
         provisionalGestureRemap = null;
         captureOrigin = e.GetPosition(CaptureArea);
+        PulseCapturePlusIcon();
         captureHoldTimer.Stop();
         captureHoldTimer.Start();
         CaptureArea.CaptureMouse();
@@ -604,6 +699,7 @@ public partial class MainWindow : Window
         if (!holdCaptured && !capturedDrag && !capturedScroll)
         {
             capturedScroll = true;
+            PulseCapturePlusIcon();
             UpgradeCapturedGesture("holdScroll");
             CaptureStateText.Text = "已识别按住并滚动";
         }
@@ -642,7 +738,7 @@ public partial class MainWindow : Window
         }
 
         ResetCapturedGestureState();
-        CaptureStateText.Text = pointerInCaptureArea ? "正在录入鼠标操作" : "鼠标移入这里即可录入";
+        CaptureStateText.Text = pointerInCaptureArea ? "按住中键或侧键以录入或测试手势" : "移入此区域以录入或测试手势";
         if (!pointerInCaptureArea)
         {
             coreProcessService.Resume();
@@ -661,7 +757,7 @@ public partial class MainWindow : Window
         capturedButton = null;
         captureHoldTimer.Stop();
         ResetCapturedGestureState();
-        CaptureStateText.Text = pointerInCaptureArea ? "正在录入鼠标操作" : "鼠标移入这里即可录入";
+        CaptureStateText.Text = pointerInCaptureArea ? "按住中键或侧键以录入或测试手势" : "移入此区域以录入或测试手势";
         if (!pointerInCaptureArea)
         {
             coreProcessService.Resume();
@@ -770,7 +866,10 @@ public partial class MainWindow : Window
         {
             created = false;
             SelectRemap(existing);
-            ShowStatus("这个操作已经设置，已定位到对应行");
+            var actionDisplay = GetActionDisplayName(existing.Action.Type);
+            var feedback = $"✓ 演练命中：{GetButtonDisplayName(button)} · {GetTriggerDisplayName(trigger)} → {actionDisplay}";
+            CaptureStateText.Text = feedback;
+            ShowStatus(feedback);
             return existing;
         }
 
@@ -778,7 +877,9 @@ public partial class MainWindow : Window
         config.Remaps.Add(remap);
         created = true;
         SelectRemap(remap);
-        ShowStatus($"已录入：{GetButtonDisplayName(button)} · {GetTriggerDisplayName(trigger)}");
+        var addFeedback = $"✦ 已添加：{GetButtonDisplayName(button)} · {GetTriggerDisplayName(trigger)}（请在下方指定动作）";
+        CaptureStateText.Text = addFeedback;
+        ShowStatus(addFeedback);
         return remap;
     }
 
@@ -988,13 +1089,7 @@ public partial class MainWindow : Window
 
     private void RefreshModifierDisplays()
     {
-        if (!IsLoaded)
-        {
-            return;
-        }
-
-        FastModifierBox.Text = BuildModifierDisplay(config.Scroll.FastModifier, "FastScroll");
-        PrecisionModifierBox.Text = BuildModifierDisplay(config.Scroll.PrecisionModifier, "PrecisionScroll");
+        // 滚动修饰键卡片已从界面移除，无需再更新修饰键文本框
     }
 
     private string BuildModifierDisplay(string configuredModifier, string actionType)
@@ -1129,12 +1224,48 @@ public partial class MainWindow : Window
         _ => null
     };
 
+    private static string GetActionDisplayName(string? actionType) => actionType switch
+    {
+        "TaskView" => "任务视图",
+        "ShowDesktop" => "显示桌面",
+        "StartMenu" => "开始菜单",
+        "DesktopLeft" => "左侧虚拟桌面",
+        "DesktopRight" => "右侧虚拟桌面",
+        "AltTab" => "切换窗口",
+        "CloseWindow" => "关闭窗口",
+        "CloseTab" => "关闭标签页",
+        "NextTab" => "下一个标签页",
+        "PreviousTab" => "上一个标签页",
+        "VolumeUp" => "提高音量",
+        "VolumeDown" => "降低音量",
+        "VolumeMute" => "静音",
+        "MediaPlayPause" => "播放或暂停",
+        "CustomShortcut" => "自定义快捷键",
+        "Original" => "执行原功能",
+        "Back" => "后退",
+        "Forward" => "前进",
+        "MiddleClick" => "中键",
+        "Zoom" => "缩放",
+        "VolumeControl" => "音量调节",
+        "TabNavigation" => "标签页切换",
+        "BrowserNavigation" => "页面前进后退",
+        "DesktopSwitch" => "虚拟桌面切换",
+        "DesktopStartMenu" => "桌面与开始菜单",
+        "FastScroll" => "快速滚动",
+        "PrecisionScroll" => "精确滚动",
+        "ScrollMove" => "滚动与移动",
+        "DesktopNavigation" => "虚拟桌面与任务视图",
+        "BrowserTabNavigation" => "网页与标签导航",
+        "None" => "不执行动作",
+        _ => actionType ?? "未设置"
+    };
+
     private static string GetButtonDisplayName(string button) => button switch
     {
         "MButton" => "中键",
-        "XButton1" => "按键4（后退键）",
-        "XButton2" => "按键5（前进键）",
-        _ => "鼠标按钮"
+        "XButton1" => "按键 4",
+        "XButton2" => "按键 5",
+        _ => "鼠标按键"
     };
 
     private static string GetTriggerDisplayName(string trigger) => trigger switch
@@ -1229,18 +1360,120 @@ public partial class MainWindow : Window
         }
     }
 
+    protected override void OnStateChanged(EventArgs e)
+    {
+        base.OnStateChanged(e);
+        if (WindowState == WindowState.Minimized)
+        {
+            MemoryService.TrimWorkingSet();
+        }
+    }
+
+    private void UpdateScrollModeRadios()
+    {
+        if (config?.Scroll is null || ScrollModeNativeRadio is null || ScrollModeSmoothRadio is null || ScrollModeInertiaRadio is null)
+        {
+            return;
+        }
+
+        isUpdatingScrollMode = true;
+        try
+        {
+            if (!config.Scroll.TakeOverWheel)
+            {
+                ScrollModeNativeRadio.IsChecked = true;
+                if (ScrollSpeedSlider is not null) ScrollSpeedSlider.IsEnabled = false;
+                if (ScrollSpeedDescription is not null) ScrollSpeedDescription.Text = "原生模式下滚动速度由 Windows 系统设置管理。";
+            }
+            else if (config.Scroll.Inertia)
+            {
+                ScrollModeInertiaRadio.IsChecked = true;
+                if (ScrollSpeedSlider is not null) ScrollSpeedSlider.IsEnabled = true;
+                if (ScrollSpeedDescription is not null) ScrollSpeedDescription.Text = "较低适合精细阅读，较高适合快速浏览。";
+            }
+            else
+            {
+                ScrollModeSmoothRadio.IsChecked = true;
+                if (ScrollSpeedSlider is not null) ScrollSpeedSlider.IsEnabled = true;
+                if (ScrollSpeedDescription is not null) ScrollSpeedDescription.Text = "较低适合精细阅读，较高适合快速浏览。";
+            }
+        }
+        finally
+        {
+            isUpdatingScrollMode = false;
+        }
+    }
+
+    private void ScrollModeRadio_Checked(object sender, RoutedEventArgs e)
+    {
+        if (isUpdatingScrollMode || config?.Scroll is null)
+        {
+            return;
+        }
+
+        if (ReferenceEquals(sender, ScrollModeNativeRadio))
+        {
+            config.Scroll.TakeOverWheel = false;
+            config.Scroll.Smooth = false;
+            config.Scroll.Inertia = false;
+            if (ScrollSpeedSlider is not null) ScrollSpeedSlider.IsEnabled = false;
+            if (ScrollSpeedDescription is not null) ScrollSpeedDescription.Text = "原生模式下滚动速度由 Windows 系统设置管理。";
+        }
+        else if (ReferenceEquals(sender, ScrollModeSmoothRadio))
+        {
+            config.Scroll.TakeOverWheel = true;
+            config.Scroll.Smooth = true;
+            config.Scroll.Inertia = false;
+            if (ScrollSpeedSlider is not null) ScrollSpeedSlider.IsEnabled = true;
+            if (ScrollSpeedDescription is not null) ScrollSpeedDescription.Text = "较低适合精细阅读，较高适合快速浏览。";
+        }
+        else if (ReferenceEquals(sender, ScrollModeInertiaRadio))
+        {
+            config.Scroll.TakeOverWheel = true;
+            config.Scroll.Smooth = false;
+            config.Scroll.Inertia = true;
+            if (ScrollSpeedSlider is not null) ScrollSpeedSlider.IsEnabled = true;
+            if (ScrollSpeedDescription is not null) ScrollSpeedDescription.Text = "较低适合精细阅读，较高适合快速浏览。";
+        }
+
+        ScheduleSave();
+    }
+
+    /// <summary>
+    /// 弹出底部现代悬浮交互岛（Floating HUD Capsule），带平滑上浮淡入与自动淡出动效
+    /// </summary>
     private void ShowStatus(string message)
     {
         StatusMessageText.Text = message;
-        StatusBar.Visibility = Visibility.Visible;
+
+        // 智能微标：错误使用感叹号，正常提示使用翠绿对勾
+        var isWarn = message.Contains("无法") || message.Contains("失败") || message.Contains("错误") || message.Contains("请");
+        StatusHudIcon.Text = isWarn ? "\uE7BA" : "\uE73E";
+        StatusHudIcon.Foreground = new SolidColorBrush(isWarn ? Color.FromRgb(0xF5, 0x9E, 0x0B) : Color.FromRgb(0x34, 0xD3, 0x99));
+
+        StatusHud.Visibility = Visibility.Visible;
         statusTimer.Stop();
+
+        // 丝滑上浮与淡入动画 (160ms CubicEase)
+        var floatUp = new DoubleAnimation(8, 0, TimeSpan.FromMilliseconds(160))
+        {
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+        };
+        var fadeIn = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(160))
+        {
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+        };
+
+        StatusHudTransform.BeginAnimation(TranslateTransform.YProperty, floatUp);
+        StatusHud.BeginAnimation(OpacityProperty, fadeIn);
+
         statusTimer.Start();
     }
 
     private void CloseStatus_Click(object sender, RoutedEventArgs e)
     {
         statusTimer.Stop();
-        StatusBar.Visibility = Visibility.Collapsed;
+        StatusHud.Visibility = Visibility.Collapsed;
     }
 
     private async Task ResolveAboutSourceAsync()

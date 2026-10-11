@@ -17,6 +17,10 @@ class MouseManager {
         this.smoothTimer := ObjBindMethod(this, "ProcessSmoothWheel")
         this.inertiaVelocity := 0.0
         this.inertiaCarry := 0.0
+        this.inertiaLastTick := 0
+        this.inertiaLastDir := ""
+        this.inertiaFlingCount := 0
+        this.inertiaRecentIntervals := []
         this.inertiaTimer := ObjBindMethod(this, "ProcessInertiaWheel")
         this.motionTimer := ObjBindMethod(this, "CheckMotionAndContext")
         this.lastCanHandle := appRuleManager.ShouldHandle()
@@ -123,8 +127,8 @@ class MouseManager {
         }
         this.wheelHookActive := false
         this.EnsureWheelHotkeys()
-        ; 15 毫秒一次，看拖动与焦点变化。
-        SetTimer(this.motionTimer, 15)
+        ; 按需启动位移检测，避免日常空转。
+        this.EnsureMotionTimer()
     }
 
     Stop() {
@@ -147,6 +151,25 @@ class MouseManager {
         }
         this.registeredButtons := []
         this.SetWheelHotkeys(false)
+        this.EnsureMotionTimer()
+    }
+
+    ; 【核心安全铁律】：主鼠标按键（LButton 左键、RButton 右键）绝对不可作为手势键或功能键进行全局拦截，
+    ; 仅允许 XButton1、XButton2、MButton 等辅助键参与手势映射，确保 Windows 系统基本操作的绝对可用性。
+
+    ; 按需控制位移检测定时器：
+    ; 仅在有按键处于按下且映射状态时以 15ms 高频运行检测拖拽手势；
+    ; 日常无按键按下时彻底休眠（0ms），消灭每秒 66 次的后台空转轮询，大幅减少 CPU 占用。
+    EnsureMotionTimer() {
+        if !this.started {
+            SetTimer(this.motionTimer, 0)
+            return
+        }
+        if this.HasActiveMappedButton() {
+            SetTimer(this.motionTimer, 15)
+        } else {
+            SetTimer(this.motionTimer, 0)
+        }
     }
 
     ; 动态控制滚轮热键挂载。
@@ -228,6 +251,7 @@ class MouseManager {
             SetTimer(state["holdTimer"], -this.holdMs)
         }
         this.EnsureWheelHotkeys()
+        this.EnsureMotionTimer()
     }
 
     OnButtonUp(buttonName, *) {
@@ -252,6 +276,7 @@ class MouseManager {
         state["isDown"] := false
         state["mode"] := "idle"
         this.EnsureWheelHotkeys()
+        this.EnsureMotionTimer()
         ; 长按、拖、滚已发生，不再当点击。
         if state["consumed"] || state["gestureUsed"] {
             state["consumed"] := false
@@ -393,10 +418,7 @@ class MouseManager {
     }
 
     OnWheel(direction, *) {
-        ; 先处理鼠标修饰，避免与按住映射抢。
-        if this.appRuleManager.ShouldHandle() && this.TryModifierWheel(direction, true) {
-            return
-        }
+        ; 手势一律由已按下的鼠标按钮（侧键/中键）判定，彻底消除键盘修饰键冲突
         activeButton := this.FindActiveHeldButton()
         if activeButton != "" {
             state := this.states[activeButton]
@@ -445,11 +467,8 @@ class MouseManager {
                 }
             }
         }
-        ; 再处理键盘修饰。否则普通滚动。
-        if this.appRuleManager.ShouldHandle() && this.TryModifierWheel(direction) {
-            return
-        }
-        ; 未开启滚动接管时，普通滚轮直接原样放行，完全不干涉系统速度。
+        ; 普通滚动：完全放行系统原生修饰键（如 Ctrl 缩放、Shift 横向卷动）。
+        ; 仅当开启了平滑或惯性等物理调优时才接管速度；否则 100% 交还系统原生。
         if this.scrollConfig["takeOverWheel"] {
             this.SendRegularWheel(direction)
         } else {
@@ -608,22 +627,55 @@ class MouseManager {
         this.actionManager.SendWheel(direction, sendCount, preserveModifiers)
     }
 
+    ; 惯性飞轮物理模型：严格根据拨动脉冲密度判定甩轮意图。日常单格慢读绝不触发；仅在极速猛刷时才激活短促滑行
     QueueInertiaWheel(direction) {
-        ; 尾段短。速度夹在 ±18。16 毫秒一拍。
-        impulse := this.scrollConfig["speed"]
-        this.inertiaVelocity += direction = "up" ? impulse : -impulse
-        this.inertiaVelocity := Max(-18.0, Min(18.0, this.inertiaVelocity))
-        SetTimer(this.inertiaTimer, 16)
+        now := A_TickCount
+        interval := now - this.inertiaLastTick
+        this.inertiaLastTick := now
+
+        ; 先立即放行当前单格滚轮，确保首触 0 延迟
+        this.actionManager.SendWheel(direction, 1, true)
+
+        ; 反向或停顿超过 160ms：判定为重新开始慢速阅读，重置飞轮计数与动量
+        if (direction != this.inertiaLastDir || interval > 160) {
+            this.inertiaFlingCount := 1
+            this.inertiaLastDir := direction
+            this.inertiaRecentIntervals := [interval]
+            this.ClearInertia()
+            return
+        }
+
+        this.inertiaRecentIntervals.Push(interval)
+        if (this.inertiaRecentIntervals.Length > 3) {
+            this.inertiaRecentIntervals.RemoveAt(1)
+        }
+
+        this.inertiaFlingCount += 1
+
+        ; 计算最近脉冲的平均间隔
+        totalInterval := 0
+        for item in this.inertiaRecentIntervals {
+            totalInterval += item
+        }
+        avgInterval := totalInterval / this.inertiaRecentIntervals.Length
+
+        ; 【严格飞轮门槛】：必须同向连续拨动满 4 格，且平均间隔小于 60 毫秒（极速猛刷），才注入飞轮滑行动量
+        if (this.inertiaFlingCount >= 4 && avgInterval < 60) {
+            impulse := this.scrollConfig["speed"] * 1.0
+            this.inertiaVelocity += direction = "up" ? impulse : -impulse
+            this.inertiaVelocity := Max(-10.0, Min(10.0, this.inertiaVelocity))
+            SetTimer(this.inertiaTimer, 16)
+        }
     }
 
+    ; 惯性步进处理：以 0.72 阻尼快速收敛，低于 0.25 立即干脆刹车，动作紧实不飘移
     ProcessInertiaWheel(*) {
         try {
             if !this.started || !this.appRuleManager.ShouldHandle() || !this.scrollConfig["takeOverWheel"] {
                 this.ClearInertia()
                 return
             }
-            ; 低于 0.12 停。每拍乘 0.82。
-            if Abs(this.inertiaVelocity) < 0.12 {
+            if Abs(this.inertiaVelocity) < 0.25 {
                 this.ClearInertia()
                 return
             }
@@ -631,9 +683,9 @@ class MouseManager {
             sendCount := Floor(magnitude)
             this.inertiaCarry := magnitude - sendCount
             if sendCount > 0 {
-                this.actionManager.SendWheel(this.inertiaVelocity > 0 ? "up" : "down", Min(sendCount, 10))
+                this.actionManager.SendWheel(this.inertiaVelocity > 0 ? "up" : "down", Min(sendCount, 4))
             }
-            this.inertiaVelocity *= 0.82
+            this.inertiaVelocity *= 0.72
         } catch {
             this.ClearInertia()
         }
@@ -642,6 +694,10 @@ class MouseManager {
     ClearInertia() {
         this.inertiaVelocity := 0.0
         this.inertiaCarry := 0.0
+        this.inertiaFlingCount := 0
+        this.inertiaRecentIntervals := []
+        this.inertiaLastTick := 0
+        this.inertiaLastDir := ""
         if this.HasOwnProp("inertiaTimer") {
             SetTimer(this.inertiaTimer, 0)
         }
@@ -772,6 +828,7 @@ class MouseManager {
             }
         }
         this.EnsureWheelHotkeys()
+        this.EnsureMotionTimer()
         this.actionManager.ReleaseAll()
     }
 
@@ -791,6 +848,7 @@ class MouseManager {
         state["wheelDirections"] := Map()
         state["mode"] := "suppressed"
         this.EnsureWheelHotkeys()
+        this.EnsureMotionTimer()
         this.actionManager.ReleaseAll()
     }
 
@@ -803,5 +861,6 @@ class MouseManager {
         state["wheelDirections"] := Map()
         state["pendingClicks"] := 0
         this.EnsureWheelHotkeys()
+        this.EnsureMotionTimer()
     }
 }

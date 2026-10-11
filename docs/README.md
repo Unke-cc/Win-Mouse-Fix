@@ -1,34 +1,37 @@
 # Win Mouse Fix 文档目录
 
-`docs/` 保存 Win Mouse Fix 的产品、设计、使用和发布文档。可以把这个目录看作项目手册，本文件是手册目录；新增文档后必须在这里登记，避免出现无人知道用途的文件。
+`docs/` 保存产品、设计、发布文档。新增文档必须在这里登记。
 
 ## 阅读顺序
 
-1. [应用设计文档](./application-design.md)：查看 `0.1.5` 的当前功能、配置、页面和验证标准。
-2. [技术选择](./technology-selection.md)：查看当前程序组成、配置生效、打包方式和仍未实现的方向。
-3. [发布与安装](./release-guide.md)：查看安装程序生成、安装、更新、卸载和发布检查。
-4. [滚动与输入更新检查清单](../tests/manual/v0.1.3-beta-update-checklist.md)：检查滚动组合键、滚动接管开关、完整动作列表、双源更新和配置管理。
-5. [项目许可](../LICENSE.md)：查看 `0.1.0`、`0.1.1`、`0.1.2 Beta`、`0.1.3 Beta`、`0.1.4 Beta` 和 `0.1.5` 的中英双语个人非商业使用范围和限制。
-6. [贡献指南](../CONTRIBUTING.md)：查看中英双语提交要求、验证命令和 CLA 接受方式。
+1. [应用设计文档](./application-design.md)：`0.1.7` 功能、页面、配置和验收。
+2. [技术选择](./technology-selection.md)：程序组成和未实现方向。
+3. [发布与安装](./release-guide.md)：打包、安装、更新、卸载。
+4. [0.1.7 发布说明](./v0.1.7-release-notes.md)：本版本相对用户可见的变化。
+5. [0.1.7 发布验收清单](../tests/manual/v0.1.7-release-checklist.md) 与 [发布候选检查清单](../tests/manual/mvp-checklist.md)。
+6. [项目许可](../LICENSE.md)
+7. [贡献指南](../CONTRIBUTING.md)
+
+`tests/manual/v0.1.2-beta-update-checklist.md` 和 `v0.1.3-beta-update-checklist.md` 只记录当时版本，不代表 `0.1.7`。
 
 ## 文档分类
 
 | 分类 | 用途 | 当前文档 |
 | --- | --- | --- |
-| 产品与设计 | 说明当前功能边界及用户体验 | [应用设计文档](./application-design.md) |
-| 开发 | 说明技术选择、程序关系、本地运行和代码约定 | [技术选择](./technology-selection.md) |
-| 测试 | 记录可重复执行的功能检查步骤 | [发布候选检查清单](../tests/manual/mvp-checklist.md)、[0.1.3 Beta 更新检查清单](../tests/manual/v0.1.3-beta-update-checklist.md) |
-| 发布 | 说明打包、安装、更新、卸载和版本检查 | [发布与安装](./release-guide.md) |
-| 用户帮助 | 面向普通用户说明安装和使用方法 | 暂无 |
-| 许可与贡献 | 规定使用范围、商业授权、第三方声明和贡献授权 | [项目许可](../LICENSE.md)、[商业许可](../COMMERCIAL-LICENSE.md)、[第三方组件声明](../THIRD_PARTY_NOTICES.md)、[贡献指南](../CONTRIBUTING.md)、[CLA](../CLA.md) |
+| 产品与设计 | 功能边界和界面 | [应用设计](./application-design.md)、[MacMouseFix 对照](./macmousefix-feature-inventory.md) |
+| 开发 | 技术选择 | [技术选择](./technology-selection.md) |
+| 测试 | 手工检查 | [mvp-checklist](../tests/manual/mvp-checklist.md)、[v0.1.7-release-checklist](../tests/manual/v0.1.7-release-checklist.md) |
+| 发布 | 打包安装 | [发布与安装](./release-guide.md)、[0.1.7 发布说明](./v0.1.7-release-notes.md) |
+| 用户帮助 | 面向普通用户的 FAQ | 暂无 |
+| 许可与贡献 | 使用范围和贡献授权 | [LICENSE](../LICENSE.md)、[商业许可](../COMMERCIAL-LICENSE.md)、[第三方](../THIRD_PARTY_NOTICES.md)、[CONTRIBUTING](../CONTRIBUTING.md)、[CLA](../CLA.md) |
 
 ## 维护规则
 
-- 文件名使用小写英文和连字符，例如 `release-guide.md`。
-- 每份文档只负责一个明确主题，标题必须直接说明用途。
-- 功能、界面或配置发生变化时，同一次提交中更新对应文档。
-- 文档中的命令、路径和配置示例必须能够实际执行或读取。
-- 尚未确定的内容明确标记为“待定”，不得写成已经完成的功能。
-- `macmousefix-feature-inventory.md` 仅为历史参考资料，不代表 Win Mouse Fix `0.1.3 Beta` 的当前功能。
+- 文件名小写英文加连字符。
+- 每份文档只负责一个主题。
+- 功能、界面或配置变化时，同一次提交更新对应文档。
+- 命令、路径、配置示例必须能实际执行或读取。
+- 未完成的内容标“待定”，不得写成已完成。
+- `macmousefix-feature-inventory.md` 是对照 Mac Mouse Fix 3.0.8 的映射表，以 Win Mouse Fix 列的实现为准。
 
-仓库根目录的 `AGENTS.md` 是贡献者工作规则，需要保留在根目录以便工具自动读取，因此不属于本手册正文。
+仓库根目录 `AGENTS.md` 是贡献者工作规则，不属于本手册正文。

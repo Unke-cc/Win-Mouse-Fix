@@ -468,7 +468,7 @@ public sealed class ExcludedApp
 
 public sealed class StartupConfig : BindableBase
 {
-    private bool runAtLogin;
+    private bool runAtLogin = true;
 
     public bool RunAtLogin
     {
@@ -479,14 +479,16 @@ public sealed class StartupConfig : BindableBase
 
 public sealed class ActionOption
 {
-    public ActionOption(string type, string name)
+    public ActionOption(string type, string name, string glyph = "")
     {
         Type = type;
         Name = name;
+        Glyph = glyph;
     }
 
     public string Type { get; }
     public string Name { get; }
+    public string Glyph { get; }
 }
 
 internal sealed class LegacyAppConfig

@@ -1,3 +1,4 @@
+﻿using WinMouseFix.Shared;
 using Drawing = System.Drawing;
 using Forms = System.Windows.Forms;
 using WinMouseFix.Gui.Models;
@@ -63,6 +64,7 @@ internal sealed class TrayApplicationContext : Forms.ApplicationContext
 
         trayService.Update(coreProcessService.IsRunning);
         readyEvent.Set();
+        MemoryService.TrimWorkingSet();
     }
 
     protected override void Dispose(bool disposing)
